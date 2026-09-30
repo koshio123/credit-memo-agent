@@ -119,6 +119,8 @@ brew install ollama          # 0.35.0
 | `docker-compose.yml`、`docker/postgres/` | PostgreSQL（pgvector + pg_bigm）の環境 |
 | `llm/` | LLM 呼び出しの抽象（型、キャッシュ、Ollama、Claude Code、テスト用の偽バックエンド、設定、ファクトリ） |
 | `retrieval/` | 本文のチャンク分け、埋め込み、BM25、RRF、PostgreSQL への保存と検索、取り込み |
+| `edinet_mcp/` | エージェント向けの MCP サーバー（検索・XBRL の財務数値・財務比率・ページ取得）。`uv run python -m edinet_mcp`（stdio。DB の起動と取り込みが要る） |
+| `scripts/check_edinet_mcp.py`、`scripts/check_mcp_agent.py` | MCP サーバーの実機確認。後者は Claude の利用枠を少し使う |
 | `evals/l2.py`、`scripts/ingest_index.py`、`scripts/eval_l2.py` | 検索の評価（L2）と、取り込み・評価のコマンド。`uv run python -m scripts.<名前>` で実行 |
 | `tests/` | 上記のテスト。DB が要るものは `-m db`（CI では除く） |
 | `scripts/check_ollama.py`、`scripts/check_claude_code.py` | 実機との接続確認。CI では実行しない。`uv run python -m scripts.<名前>` で実行 |
@@ -189,5 +191,5 @@ Claude Code 経由を使う場合は、Claude Code に自分のアカウント�
 | EDINET API キー | 取得・設定済み。確認スクリプトの初回実行でキーが画面に出たが、ユーザーの判断で再発行はしていない。原因は修正済み |
 | 対象企業 10 社の選定 | **完了**（`evals/datasets/companies.json`。経緯と限界は decisions.md） |
 | GitHub へのプッシュ・CI | 先頭 2 コミットは実施・成功済み。以降のコミットのプッシュ後の CI は GitHub Actions で確認する |
-| `edinet-mcp` と Agent SDK の接続 | W2 で確認 |
+| `edinet-mcp` と Agent SDK の接続 | **完了**（`scripts/check_mcp_agent.py`。結果は decisions.md） |
 | `anthropic_api` バックエンド | 未実装（選ぶと `NotImplementedError`） |

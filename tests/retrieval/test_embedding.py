@@ -3,6 +3,7 @@
 import math
 
 import pytest
+
 from retrieval.embedding import MODELS, HashEmbedder, SentenceTransformerEmbedder
 
 
