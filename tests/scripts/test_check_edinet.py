@@ -47,3 +47,9 @@ def test_接続エラーでもキーが出ない(caplog: pytest.LogCaptureFixtur
 
     assert code == 1
     assert CANARY not in caplog.text
+
+
+def test_JSONでない200応答は失敗として終える() -> None:
+    html = httpx.MockTransport(lambda _: httpx.Response(200, text="<html>maintenance</html>"))
+
+    assert check_edinet.run(CANARY, "2026-09-29", _client(html)) == 1

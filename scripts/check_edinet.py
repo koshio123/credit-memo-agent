@@ -50,7 +50,11 @@ def run(key: str, date: str, client: httpx.Client) -> int:
         )
         return 1
 
-    body = res.json()
+    try:
+        body = res.json()
+    except ValueError:
+        log.error("応答がJSONではありません（メンテナンス中の可能性）")
+        return 1
     meta = body.get("metadata", {})
     log.info("status=%s message=%s", meta.get("status"), meta.get("message"))
     if str(meta.get("status")) != "200":
