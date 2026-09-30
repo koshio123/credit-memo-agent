@@ -6,11 +6,12 @@
 書類の本体は data/（gitignore）に置き、リポジトリには含めない。
 """
 
+import argparse
 import logging
 from pathlib import Path
 
-from evals.companies import load_companies
-from ingest.edinet import EdinetClient, fetch_all
+from evals.companies import DATASETS, load_dataset
+from ingest.edinet import EdinetClient, Kind, fetch_all
 from ingest.settings import EdinetSettings
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -20,12 +21,23 @@ DATA_DIR = Path("data/edinet")
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dataset", choices=sorted(DATASETS), default="dev")
+    parser.add_argument(
+        "--kinds", nargs="+", choices=[k.value for k in Kind], default=[k.value for k in Kind]
+    )
+    args = parser.parse_args()
+
     key = EdinetSettings().edinet_api_key.get_secret_value()
     if not key:
         log.error("EDINET_API_KEY が .env に設定されていません")
         return 1
 
-    results = fetch_all(EdinetClient(api_key=key, data_dir=DATA_DIR), load_companies())
+    results = fetch_all(
+        EdinetClient(api_key=key, data_dir=DATA_DIR),
+        load_dataset(args.dataset),
+        kinds=[Kind(k) for k in args.kinds],
+    )
 
     fetched = [r for r in results if r.downloaded]
     skipped = [r for r in results if not r.downloaded and not r.error]

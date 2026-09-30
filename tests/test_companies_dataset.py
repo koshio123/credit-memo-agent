@@ -1,6 +1,6 @@
 import pytest
 
-from evals.companies import Company, load_companies
+from evals.companies import Company, load_companies, load_dataset
 
 
 @pytest.fixture(scope="module")
@@ -45,3 +45,21 @@ def test_水準がばらつくよう選んでいる(companies: list[Company]) ->
         s.equity_ratio_pct >= 30 and s.current_ratio_pct >= 120 and s.operating_margin_pct >= 3
         for s in snaps
     ), "3指標とも標準水準"
+
+
+# ---- 保留データ（held-out） ----
+
+
+def test_保留データは開発用と重ならない() -> None:
+    dev, heldout = load_dataset("dev"), load_dataset("heldout")
+    assert len(heldout) == 10
+    assert not {c.sec_code for c in dev} & {c.sec_code for c in heldout}
+    dev_docs = {f.doc_id for c in dev for f in (c.filings.current, c.filings.previous)}
+    held_docs = {f.doc_id for c in heldout for f in (c.filings.current, c.filings.previous)}
+    assert not dev_docs & held_docs
+
+
+def test_保留データの有報は直近期と前期がちょうど1年違い() -> None:
+    for c in load_dataset("heldout"):
+        cur, prev = c.filings.current, c.filings.previous
+        assert int(cur.period_end[:4]) - int(prev.period_end[:4]) == 1, c.name

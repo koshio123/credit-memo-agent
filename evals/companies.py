@@ -6,6 +6,11 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 DATASET_PATH = Path(__file__).parent / "datasets" / "companies.json"
+# dev: 規則の作成に PDF を見た会社 / heldout: 規則の作成に使っていない会社（汎化性能を測る）
+DATASETS = {
+    "dev": DATASET_PATH,
+    "heldout": Path(__file__).parent / "datasets" / "heldout_companies.json",
+}
 
 
 class Filing(BaseModel):
@@ -57,3 +62,7 @@ class CompanyDataset(BaseModel):
 
 def load_companies(path: Path = DATASET_PATH) -> list[Company]:
     return CompanyDataset.model_validate(json.loads(path.read_text(encoding="utf-8"))).companies
+
+
+def load_dataset(name: str) -> list[Company]:
+    return load_companies(DATASETS[name])

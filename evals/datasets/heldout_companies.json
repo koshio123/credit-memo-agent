@@ -1,0 +1,275 @@
+{
+  "selected_on": "2026-09-30",
+  "companies": [
+    {
+      "sec_code": "2269",
+      "edinet_code": "E21902",
+      "name": "明治ホールディングス",
+      "industry": "食料品",
+      "fiscal_year_end": "3月31日",
+      "capital_million_yen": 30000,
+      "filings": {
+        "current": {
+          "doc_id": "S100YILP",
+          "period_end": "2026-03-31",
+          "submitted": "2026-06-24"
+        },
+        "previous": {
+          "doc_id": "S100W6WK",
+          "period_end": "2025-03-31",
+          "submitted": "2025-06-26"
+        }
+      },
+      "why_selected": "保留データ（held-out）。規則を作るときに PDF を見ていない会社を、無作為に選んだ。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。保留データの選定には使っていない",
+        "equity_ratio_pct": 64.8,
+        "current_ratio_pct": 187,
+        "operating_margin_pct": 7.9
+      }
+    },
+    {
+      "sec_code": "4997",
+      "edinet_code": "E00937",
+      "name": "日本農薬",
+      "industry": "化学",
+      "fiscal_year_end": "3月31日",
+      "capital_million_yen": 14939,
+      "filings": {
+        "current": {
+          "doc_id": "S100YATP",
+          "period_end": "2026-03-31",
+          "submitted": "2026-06-12"
+        },
+        "previous": {
+          "doc_id": "S100VYTC",
+          "period_end": "2025-03-31",
+          "submitted": "2025-06-18"
+        }
+      },
+      "why_selected": "保留データ（held-out）。規則を作るときに PDF を見ていない会社を、無作為に選んだ。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。保留データの選定には使っていない",
+        "equity_ratio_pct": 56.2,
+        "current_ratio_pct": 264,
+        "operating_margin_pct": 9.7
+      }
+    },
+    {
+      "sec_code": "6590",
+      "edinet_code": "E01757",
+      "name": "芝浦メカトロニクス",
+      "industry": "電気機器",
+      "fiscal_year_end": "3月31日",
+      "capital_million_yen": 6761,
+      "filings": {
+        "current": {
+          "doc_id": "S100YAST",
+          "period_end": "2026-03-31",
+          "submitted": "2026-06-15"
+        },
+        "previous": {
+          "doc_id": "S100VXZA",
+          "period_end": "2025-03-31",
+          "submitted": "2025-06-17"
+        }
+      },
+      "why_selected": "保留データ（held-out）。規則を作るときに PDF を見ていない会社を、無作為に選んだ。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。保留データの選定には使っていない",
+        "equity_ratio_pct": 55.1,
+        "current_ratio_pct": 188,
+        "operating_margin_pct": 17.3
+      }
+    },
+    {
+      "sec_code": "7735",
+      "edinet_code": "E02288",
+      "name": "ＳＣＲＥＥＮホールディングス",
+      "industry": "電気機器",
+      "fiscal_year_end": "3月31日",
+      "capital_million_yen": 54044,
+      "filings": {
+        "current": {
+          "doc_id": "S100YK9N",
+          "period_end": "2026-03-31",
+          "submitted": "2026-06-25"
+        },
+        "previous": {
+          "doc_id": "S100VZW3",
+          "period_end": "2025-03-31",
+          "submitted": "2025-06-19"
+        }
+      },
+      "why_selected": "保留データ（held-out）。規則を作るときに PDF を見ていない会社を、無作為に選んだ。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。保留データの選定には使っていない",
+        "equity_ratio_pct": 67.4,
+        "current_ratio_pct": 228,
+        "operating_margin_pct": 20.2
+      }
+    },
+    {
+      "sec_code": "7947",
+      "edinet_code": "E02412",
+      "name": "エフピコ",
+      "industry": "化学",
+      "fiscal_year_end": "3月31日",
+      "capital_million_yen": 13150,
+      "filings": {
+        "current": {
+          "doc_id": "S100YDYF",
+          "period_end": "2026-03-31",
+          "submitted": "2026-06-19"
+        },
+        "previous": {
+          "doc_id": "S100W0NR",
+          "period_end": "2025-03-31",
+          "submitted": "2025-06-20"
+        }
+      },
+      "why_selected": "保留データ（held-out）。規則を作るときに PDF を見ていない会社を、無作為に選んだ。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。保留データの選定には使っていない",
+        "equity_ratio_pct": 54.3,
+        "current_ratio_pct": 122,
+        "operating_margin_pct": 9.0
+      }
+    },
+    {
+      "sec_code": "8041",
+      "edinet_code": "E02530",
+      "name": "ＯＵＧホールディングス",
+      "industry": "卸売業",
+      "fiscal_year_end": "3月31日",
+      "capital_million_yen": 6495,
+      "filings": {
+        "current": {
+          "doc_id": "S100YGQH",
+          "period_end": "2026-03-31",
+          "submitted": "2026-06-23"
+        },
+        "previous": {
+          "doc_id": "S100W4I7",
+          "period_end": "2025-03-31",
+          "submitted": "2025-06-26"
+        }
+      },
+      "why_selected": "保留データ（held-out）。規則を作るときに PDF を見ていない会社を、無作為に選んだ。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。保留データの選定には使っていない",
+        "equity_ratio_pct": 42.8,
+        "current_ratio_pct": 161,
+        "operating_margin_pct": 1.7
+      }
+    },
+    {
+      "sec_code": "8881",
+      "edinet_code": "E03984",
+      "name": "日神グループホールディングス",
+      "industry": "不動産業",
+      "fiscal_year_end": "3月31日",
+      "capital_million_yen": 10111,
+      "filings": {
+        "current": {
+          "doc_id": "S100YK7Q",
+          "period_end": "2026-03-31",
+          "submitted": "2026-06-25"
+        },
+        "previous": {
+          "doc_id": "S100W4EZ",
+          "period_end": "2025-03-31",
+          "submitted": "2025-06-24"
+        }
+      },
+      "why_selected": "保留データ（held-out）。規則を作るときに PDF を見ていない会社を、無作為に選んだ。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。保留データの選定には使っていない",
+        "equity_ratio_pct": 49.4,
+        "current_ratio_pct": 347,
+        "operating_margin_pct": 7.6
+      }
+    },
+    {
+      "sec_code": "8934",
+      "edinet_code": "E04031",
+      "name": "サンフロンティア不動産",
+      "industry": "不動産業",
+      "fiscal_year_end": "3月31日",
+      "capital_million_yen": 11965,
+      "filings": {
+        "current": {
+          "doc_id": "S100YGKR",
+          "period_end": "2026-03-31",
+          "submitted": "2026-06-22"
+        },
+        "previous": {
+          "doc_id": "S100W1T3",
+          "period_end": "2025-03-31",
+          "submitted": "2025-06-23"
+        }
+      },
+      "why_selected": "保留データ（held-out）。規則を作るときに PDF を見ていない会社を、無作為に選んだ。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。保留データの選定には使っていない",
+        "equity_ratio_pct": 45.5,
+        "current_ratio_pct": 735,
+        "operating_margin_pct": 21.8
+      }
+    },
+    {
+      "sec_code": "9143",
+      "edinet_code": "E32292",
+      "name": "ＳＧホールディングス",
+      "industry": "陸運業",
+      "fiscal_year_end": "3月31日",
+      "capital_million_yen": 11882,
+      "filings": {
+        "current": {
+          "doc_id": "S100Y9P7",
+          "period_end": "2026-03-31",
+          "submitted": "2026-06-10"
+        },
+        "previous": {
+          "doc_id": "S100W6EF",
+          "period_end": "2025-03-31",
+          "submitted": "2025-06-26"
+        }
+      },
+      "why_selected": "保留データ（held-out）。規則を作るときに PDF を見ていない会社を、無作為に選んだ。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。保留データの選定には使っていない",
+        "equity_ratio_pct": 44.6,
+        "current_ratio_pct": 86,
+        "operating_margin_pct": 5.5
+      }
+    },
+    {
+      "sec_code": "9900",
+      "edinet_code": "E03178",
+      "name": "サガミホールディングス",
+      "industry": "小売業",
+      "fiscal_year_end": "3月31日",
+      "capital_million_yen": 9090,
+      "filings": {
+        "current": {
+          "doc_id": "S100YGZJ",
+          "period_end": "2026-03-31",
+          "submitted": "2026-06-23"
+        },
+        "previous": {
+          "doc_id": "S100W3N0",
+          "period_end": "2025-03-31",
+          "submitted": "2025-06-25"
+        }
+      },
+      "why_selected": "保留データ（held-out）。規則を作るときに PDF を見ていない会社を、無作為に選んだ。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。保留データの選定には使っていない",
+        "equity_ratio_pct": 72.5,
+        "current_ratio_pct": 142,
+        "operating_margin_pct": 7.6
+      }
+    }
+  ]
+}
