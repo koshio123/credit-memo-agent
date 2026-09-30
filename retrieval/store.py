@@ -132,6 +132,25 @@ class ChunkStore:
         rows = self._conn.execute(query, (doc_id,)).fetchall()
         return [_chunk_from_row(r) for r in rows]
 
+    def get_document(self, doc_id: str) -> DocumentRecord | None:
+        row = self._conn.execute(
+            "SELECT doc_id, sec_code, company, period_end, n_pages FROM documents"
+            " WHERE doc_id = %s",
+            (doc_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return DocumentRecord(str(row[0]), str(row[1]), str(row[2]), str(row[3]), int(row[4]))  # type: ignore[call-overload]
+
+    def embedded_models(self, doc_id: str) -> list[str]:
+        """文書のチャンクに埋め込みが保存されているモデル（名前順）。"""
+        rows = self._conn.execute(
+            "SELECT DISTINCT e.model FROM chunk_embeddings e JOIN chunks c USING (chunk_id)"
+            " WHERE c.doc_id = %s ORDER BY e.model",
+            (doc_id,),
+        ).fetchall()
+        return [str(r[0]) for r in rows]
+
     def all_chunks(self) -> list[Chunk]:
         """全文書のチャンクを、文書・並び順に返す（BM25 の索引を作るのに使う）。"""
         query = sql.SQL("SELECT {cols} FROM chunks c ORDER BY c.doc_id, c.seq").format(

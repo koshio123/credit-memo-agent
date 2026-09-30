@@ -183,3 +183,20 @@ def test_読み取りの後の書き込みも_別の接続から見える(store:
     assert _count_from_other_connection(store, "documents") == 1
     assert _count_from_other_connection(store, "chunks") == 1
     assert _count_from_other_connection(store, "chunk_embeddings") == 1
+
+
+def test_文書の情報を読み出せる_無ければNone(store: ChunkStore) -> None:
+    assert store.get_document("A") is None
+    doc = DocumentRecord("A", "1", "甲", "2026-03-31", 1)
+    store.upsert_document(doc, [])
+    assert store.get_document("A") == doc
+
+
+def test_文書に埋め込みのあるモデルの一覧(store: ChunkStore) -> None:
+    store.upsert_document(
+        DocumentRecord("A", "1", "甲", "2026-03-31", 1), [Chunk("A:0", "A", ["h"], 1, 1, "本文")]
+    )
+    store.add_embeddings("m2", ["A:0"], [[1.0, 0.0]])
+    store.add_embeddings("m1", ["A:0"], [[0.0, 1.0]])
+    assert store.embedded_models("A") == ["m1", "m2"]
+    assert store.embedded_models("NONE") == []

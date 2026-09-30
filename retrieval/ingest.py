@@ -16,7 +16,7 @@ from retrieval.store import ChunkStore, DocumentRecord
 class IngestResult:
     n_chunks: int
     embedded: dict[str, int]  # モデル -> 今回埋め込んだチャンク数（取り込み済みなら0）
-    over_limit: dict[str, int]  # モデル -> 入力上限を超えて、黙って切り捨てられるチャンク数
+    over_limit: dict[str, int]  # 今回埋め込んだモデル -> 入力上限を超えて、黙って切り捨てられる数
 
 
 def ingest_document(
@@ -27,9 +27,16 @@ def ingest_document(
     max_chars: int = DEFAULT_MAX_CHARS,
 ) -> IngestResult:
     chunks = chunk_pages(doc.doc_id, pages, max_chars=max_chars)
-    unchanged = store.chunks_unchanged(doc.doc_id, chunks)
+    unchanged = store.get_document(doc.doc_id) == doc and store.chunks_unchanged(doc.doc_id, chunks)
     if not unchanged:
-        # 古いチャンクと、その埋め込みは、置き換えで消える
+        # 置き換えると、古いチャンクと、全モデルの埋め込みが連鎖削除で消える。
+        # 渡していないモデルの分は作り直せないので、消す前に断る
+        missing = sorted(set(store.embedded_models(doc.doc_id)) - {e.key for e in embedders})
+        if missing:
+            raise ValueError(
+                f"文書 {doc.doc_id} を置き換えると、次のモデルの埋め込みが消える: "
+                f"{', '.join(missing)}。これらのモデルも渡すこと"
+            )
         store.upsert_document(doc, chunks)
 
     texts = [c.text for c in chunks]
@@ -37,11 +44,13 @@ def ingest_document(
     embedded: dict[str, int] = {}
     over_limit: dict[str, int] = {}
     for embedder in embedders:
-        over_limit[embedder.key] = sum(embedder.over_limit(texts))
         if chunks and store.count_embeddings(embedder.key, doc.doc_id) == len(chunks):
             embedded[embedder.key] = 0
             continue
         vectors = embedder.embed_documents(texts)
+        if any(len(v) != embedder.dim for v in vectors):
+            raise ValueError(f"{embedder.key}: ベクトルの次元が宣言（{embedder.dim}）と違う")
         store.add_embeddings(embedder.key, ids, vectors)
         embedded[embedder.key] = len(chunks)
+        over_limit[embedder.key] = sum(embedder.over_limit(texts))
     return IngestResult(len(chunks), embedded, over_limit)

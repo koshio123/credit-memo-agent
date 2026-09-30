@@ -4,7 +4,7 @@ import pytest
 
 from retrieval.chunker import Chunk
 from retrieval.embedding import HashEmbedder
-from retrieval.search import Retriever
+from retrieval.search import LexicalIndex, Retriever
 from retrieval.store import ChunkStore, DocumentRecord, Hit
 
 pytestmark = pytest.mark.db
@@ -119,6 +119,27 @@ def test_索引を作った後に取り込んだ文書も_検索できる(store:
         [Chunk("D1:0", "D1", ["h"], 1, 1, RISK)],
     )
     assert ids(r.search("原材料価格", k=3, mode="bm25")) == ["D1:0"]
+
+
+def test_モードを省略すると_評価で最良だったBM25とベクトルの融合(
+    loaded: tuple[ChunkStore, HashEmbedder],
+) -> None:
+    store, e = loaded
+    r = Retriever(store, e)
+    q = "原材料価格の高騰が収益に与える影響"
+    assert ids(r.search(q, k=3)) == ids(r.search(q, k=3, mode="hybrid_bm25"))
+
+
+def test_語句側の索引は_複数のRetrieverで共有できる(
+    loaded: tuple[ChunkStore, HashEmbedder],
+) -> None:
+    store, e = loaded
+    shared = LexicalIndex(store)
+    r1, r2 = Retriever(store, e, lexical_index=shared), Retriever(store, e, lexical_index=shared)
+    r1.search("原材料価格", k=1, mode="bm25")
+    built = shared.index
+    r2.search("原材料価格", k=1, mode="bm25")
+    assert shared.index is built  # 作り直していない
 
 
 def test_知らないモードはエラー(loaded: tuple[ChunkStore, HashEmbedder]) -> None:

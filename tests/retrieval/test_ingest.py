@@ -107,3 +107,68 @@ def test_本文が空の文書は_失敗させず0件で終える(store: ChunkSt
     result = ingest_document(store, DOC, [_page("", 1)], [CountingEmbedder()])
     assert result.n_chunks == 0
     assert store.get_chunks("D1") == []
+
+
+def test_文書の情報だけ変わっても_保存し直す(store: ChunkStore) -> None:
+    e = CountingEmbedder()
+    ingest_document(store, DOC, PAGES, [e])
+
+    renamed = DocumentRecord("D1", "9999", "改名後", "2026-03-31", 2)
+    ingest_document(store, renamed, PAGES, [e])
+
+    assert store.get_document("D1") == renamed
+    assert store.count_embeddings("hash", "D1") == 2  # 埋め込みは作り直されている
+
+
+def test_本文が空でも_文書の行は作る(store: ChunkStore) -> None:
+    ingest_document(store, DOC, [_page("", 1)], [CountingEmbedder()])
+    assert store.get_document("D1") == DOC
+
+
+def test_内容が変わる文書を_一部のモデルだけで取り込もうとすると_何も消さずに断る(
+    store: ChunkStore,
+) -> None:
+    # 置き換えると、渡していないモデルの埋め込みも連鎖削除で消え、黙って検索が壊れる
+    a, b = CountingEmbedder("model-a"), CountingEmbedder("model-b")
+    ingest_document(store, DOC, PAGES, [a, b])
+    changed = [PAGES[0], _page("4 【従業員の状況】\n従業員の平均年齢は四十五歳です。", 2)]
+
+    with pytest.raises(ValueError, match="model-b"):
+        ingest_document(store, DOC, changed, [a])
+
+    assert "四十歳" in " ".join(c.text for c in store.get_chunks("D1"))  # 元のまま
+    assert store.count_embeddings("model-b", "D1") == 2
+
+
+def test_内容が同じなら_一部のモデルだけでも取り込める(store: ChunkStore) -> None:
+    a, b = CountingEmbedder("model-a"), CountingEmbedder("model-b")
+    ingest_document(store, DOC, PAGES, [a, b])
+    ingest_document(store, DOC, PAGES, [a])
+    assert store.count_embeddings("model-b", "D1") == 2
+
+
+class WrongDimEmbedder(CountingEmbedder):
+    def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
+        return [[0.0] * 3 for _ in texts]  # 宣言（16次元）と違う
+
+
+def test_ベクトルの次元が宣言と違えば_保存せずに断る(store: ChunkStore) -> None:
+    with pytest.raises(ValueError, match="次元"):
+        ingest_document(store, DOC, PAGES, [WrongDimEmbedder()])
+    assert store.count_embeddings("hash", "D1") == 0
+
+
+def test_取り込み済みのモデルは_トークンの数え直しもしない(store: ChunkStore) -> None:
+    class Spy(CountingEmbedder):
+        over_calls = 0
+
+        def over_limit(self, documents: Sequence[str]) -> list[bool]:
+            Spy.over_calls += 1
+            return super().over_limit(documents)
+
+    e = Spy()
+    ingest_document(store, DOC, PAGES, [e])
+    result = ingest_document(store, DOC, PAGES, [e])
+
+    assert Spy.over_calls == 1
+    assert result.over_limit == {}  # 今回埋め込んだモデルだけ報告する
