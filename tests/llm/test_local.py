@@ -3,7 +3,12 @@ import json
 import httpx
 import pytest
 
-from llm.local import PROMPT_OVERHEAD_TOKENS, TOKENS_PER_CHAR_UPPER_BOUND, OllamaBackend
+from llm.local import (
+    PER_MESSAGE_OVERHEAD_TOKENS,
+    PROMPT_OVERHEAD_TOKENS,
+    TOKENS_PER_CHAR_ESTIMATE,
+    OllamaBackend,
+)
 from llm.types import LLMBackendError, LLMRequest, Message
 
 pytestmark = pytest.mark.anyio
@@ -184,7 +189,8 @@ async def test_num_ctxに収まらない入力は送信せずエラーにする(
 
 async def test_収まる限界ちょうどの入力は送り_1文字超えたら止める() -> None:
     num_ctx, max_tokens = 1000, 100
-    limit_chars = int((num_ctx - max_tokens - PROMPT_OVERHEAD_TOKENS) / TOKENS_PER_CHAR_UPPER_BOUND)
+    overhead = PROMPT_OVERHEAD_TOKENS + PER_MESSAGE_OVERHEAD_TOKENS * 1  # user 1通
+    limit_chars = int((num_ctx - max_tokens - overhead) / TOKENS_PER_CHAR_ESTIMATE)
     calls: list[int] = []
     backend = _sized_backend(num_ctx, calls)
 
@@ -194,6 +200,25 @@ async def test_収まる限界ちょうどの入力は送り_1文字超えたら
     with pytest.raises(LLMBackendError, match="num_ctx"):
         await backend.complete(_request_of(limit_chars + 1, max_tokens))
     assert len(calls) == 1
+
+
+async def test_見積もりは実測の最大値に余裕を持たせている() -> None:
+    # 実測（Qwen3）の最大は 有報風の文章 0.95 トークン/文字。珍しい漢字や記号に備えて余裕を持つ
+    assert TOKENS_PER_CHAR_ESTIMATE >= 0.95 * 1.25
+
+
+async def test_短い発話が多い履歴はメッセージごとの定型分を見積もりに含める() -> None:
+    calls: list[int] = []
+    backend = _sized_backend(num_ctx=1000, calls=calls)
+    request = LLMRequest(
+        messages=[Message(role="user", content="a") for _ in range(100)],
+        tier="fast",
+        max_tokens=100,
+    )  # 文字数は100しかないが、100通分の定型分で収まらない
+
+    with pytest.raises(LLMBackendError, match="num_ctx"):
+        await backend.complete(request)
+    assert calls == []
 
 
 async def test_systemも見積もりに含める() -> None:

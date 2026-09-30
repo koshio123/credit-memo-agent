@@ -9,11 +9,13 @@ from llm.types import LLMBackendError, LLMRequest, LLMResponse, Tier, Usage
 # 応答の prompt_eval_count も切り詰め後の値を返すため、応答からは切り捨てを確実に検知できない
 # （実機で確認: 4426トークンの入力が、警告ログだけで258トークンとして「成功」した）。
 # Qwen3 のトークナイザでの実測（1文字あたり）: 日本語の散文 0.69 / 数値の表 0.89 /
-# 有報風の文章 0.95。1.0 を上限として見積もれば、これらを過小評価しない。
+# 有報風の文章 0.95 / 英数字 0.56。実測の最大 0.95 に約3割の余裕を持たせて 1.25 とする。
+# 珍しい漢字や記号（▲△、絵文字）は 1 文字が複数トークンになりうるため、1.0 では足りない。
 # 英数字が多い入力は過大評価になる（安全側）。
-TOKENS_PER_CHAR_UPPER_BOUND = 1.0
-# チャットのテンプレート（役割タグなど）の分の余裕
+TOKENS_PER_CHAR_ESTIMATE = 1.25
+# チャットのテンプレートの分の余裕: 全体で固定の分と、メッセージ 1 通ごと（役割タグなど）の分
 PROMPT_OVERHEAD_TOKENS = 64
+PER_MESSAGE_OVERHEAD_TOKENS = 16
 
 
 class _ChatMessage(BaseModel):
@@ -63,7 +65,12 @@ class OllamaBackend:
 
     def _check_fits(self, request: LLMRequest) -> None:
         chars = len(request.system) + sum(len(m.content) for m in request.messages)
-        estimated = math.ceil(chars * TOKENS_PER_CHAR_UPPER_BOUND) + PROMPT_OVERHEAD_TOKENS
+        n_messages = len(request.messages) + (1 if request.system else 0)
+        estimated = (
+            math.ceil(chars * TOKENS_PER_CHAR_ESTIMATE)
+            + PROMPT_OVERHEAD_TOKENS
+            + PER_MESSAGE_OVERHEAD_TOKENS * n_messages
+        )
         if estimated + request.max_tokens > self.num_ctx:
             raise LLMBackendError(
                 f"入力が num_ctx={self.num_ctx} に収まらない可能性があります"
