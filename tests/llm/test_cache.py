@@ -49,6 +49,16 @@ async def test_モデル割当が変わればキャッシュを使い回さな�
     assert res.cached is False
 
 
+async def test_出力に影響する設定が変わればキャッシュを使い回さない(tmp_path: Path) -> None:
+    before = CachedBackend(ScriptedBackend(["思考オフの応答"], salt="think=false"), tmp_path)
+    after = CachedBackend(ScriptedBackend(["思考オンの応答"], salt="think=true"), tmp_path)
+
+    await before.complete(_req())
+    res = await after.complete(_req())
+
+    assert (res.text, res.cached) == ("思考オンの応答", False)
+
+
 async def test_失敗した呼び出しはキャッシュしない(tmp_path: Path) -> None:
     inner = ScriptedBackend([LLMBackendError("一時的な失敗"), "リトライ成功"])
     backend = CachedBackend(inner, tmp_path)

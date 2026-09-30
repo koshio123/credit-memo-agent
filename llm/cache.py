@@ -35,6 +35,10 @@ class CachedBackend:
     def name(self) -> str:
         return self.inner.name
 
+    @property
+    def cache_salt(self) -> str:
+        return self.inner.cache_salt
+
     def model_for(self, tier: Tier) -> str:
         return self.inner.model_for(tier)
 
@@ -53,6 +57,7 @@ class CachedBackend:
         payload = {
             "backend": self.inner.name,
             "model": self.inner.model_for(request.tier),
+            "salt": self.inner.cache_salt,
             "request": request.model_dump(mode="json"),
         }
         canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False)

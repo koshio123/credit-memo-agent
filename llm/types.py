@@ -49,6 +49,11 @@ class LLMBackend(Protocol):
     @property
     def name(self) -> str: ...
 
+    @property
+    def cache_salt(self) -> str:
+        """モデル名以外で出力に影響する設定（コンテキスト長など）。キャッシュのキーに混ぜる。"""
+        ...
+
     def model_for(self, tier: Tier) -> str:
         """段階に対応する実モデル名。キャッシュのキーにも使う。"""
         ...

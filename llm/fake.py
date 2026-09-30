@@ -18,7 +18,9 @@ class ScriptedBackend:
         self,
         script: Iterable[str | LLMResponse | LLMBackendError],
         models: dict[Tier, str] | None = None,
+        salt: str = "",
     ) -> None:
+        self.cache_salt = salt
         self._script = deque(script)
         self._models = {**_DEFAULT_MODELS, **(models or {})}
         self.requests: list[LLMRequest] = []

@@ -142,3 +142,21 @@ async def test_thinkの設定をそのまま送る() -> None:
     await backend.complete(LLMRequest(messages=[Message(role="user", content="x")]))
 
     assert bodies[0]["think"] is True
+
+
+def test_cache_saltにnum_ctxとthinkが入る() -> None:
+    def make(num_ctx: int, think: bool) -> OllamaBackend:
+        return OllamaBackend(
+            base_url="http://ollama.test",
+            models={"fast": "s", "standard": "m", "strong": "l"},
+            num_ctx=num_ctx,
+            think=think,
+        )
+
+    salts = {
+        make(1000, False).cache_salt,
+        make(2000, False).cache_salt,
+        make(1000, True).cache_salt,
+    }
+
+    assert len(salts) == 3

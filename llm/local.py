@@ -42,6 +42,10 @@ class OllamaBackend:
         self.think = think
         self._client = client or httpx.AsyncClient(timeout=timeout)
 
+    @property
+    def cache_salt(self) -> str:
+        return f"num_ctx={self.num_ctx};think={self.think}"
+
     def model_for(self, tier: Tier) -> str:
         return self._models[tier]
 
@@ -76,7 +80,9 @@ class OllamaBackend:
         except ValidationError as e:
             raise LLMBackendError(f"Ollama の応答を解釈できません: {e}") from e
         if parsed.prompt_eval_count >= self.num_ctx:
-            # 入力が上限に達している。先頭が切り捨てられた状態で、もっともらしい答えが返っている
+            # 入力が上限に達している。先頭が切り捨てられた状態で、もっともらしい答えが返っている。
+            # あくまで補助的な検知: Ollama がプロンプトのキャッシュを再利用すると、この値は
+            # 実際より小さく出て見逃す。確実に防ぐには、呼び出し側で入力量を制御する。
             raise LLMBackendError(
                 f"プロンプトが num_ctx={self.num_ctx} に達しました。入力が切り捨てられた可能性が"
                 "あるため応答を採用しません。num_ctx を上げるか、入力を減らしてください"
