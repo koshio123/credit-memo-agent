@@ -9,6 +9,7 @@ requires-python = ">=3.14"
 dependencies = [
     "claude-agent-sdk>=0.2.162",
     "httpx>=0.28.1",
+    "mcp>=2.2",
     "pdfplumber>=0.11.10",
     "pgvector>=0.5.0",
     "psycopg[binary]>=3.3.6",

@@ -146,3 +146,32 @@ def test_知らないモードはエラー(loaded: tuple[ChunkStore, HashEmbedde
     store, e = loaded
     with pytest.raises(ValueError):
         Retriever(store, e).search("x", k=1, mode="magic")  # type: ignore[arg-type]
+
+
+def test_複数のスレッドから同時に検索しても_索引の作り直しで結果が壊れない(
+    loaded: tuple[ChunkStore, HashEmbedder],
+) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    store, e = loaded
+    shared = LexicalIndex(store)
+
+    def run(_: int) -> list[str]:
+        return ids(
+            Retriever(store, e, shared).search("原材料価格", k=3, mode="bm25", doc_ids=["D1"])
+        )
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(run, range(32)))
+    assert all(r == ["D1:1"] for r in results)
+
+
+def test_書類が検索できる状態かを調べられる(loaded: tuple[ChunkStore, HashEmbedder]) -> None:
+    store, e = loaded
+    r = Retriever(store, e)
+    assert r.is_indexed("D1")
+    assert not r.is_indexed("NONE")
+    # 別のモデルの埋め込みしか無い書類は、このモデルでは検索できない
+    other = HashEmbedder(dim=64)
+    other_key = Retriever(store, other)
+    assert other_key.is_indexed("D1")  # 同じ key "hash"
