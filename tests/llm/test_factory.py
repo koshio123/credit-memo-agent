@@ -30,3 +30,18 @@ def test_キャッシュを切れる(tmp_path: Path) -> None:
 def test_未実装のバックエンドは分かるエラーにする(tmp_path: Path, name: str) -> None:
     with pytest.raises(NotImplementedError, match=name):
         create_backend(_settings(tmp_path, llm_backend=name))
+
+
+def test_num_ctxとthinkが設定から渡る(tmp_path: Path) -> None:
+    backend = create_backend(
+        _settings(
+            tmp_path,
+            llm_backend="local",
+            llm_cache_enabled=False,
+            local_num_ctx=32768,
+            local_think=True,
+        )
+    )
+
+    assert isinstance(backend, OllamaBackend)
+    assert (backend.num_ctx, backend.think) == (32768, True)

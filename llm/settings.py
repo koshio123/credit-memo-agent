@@ -17,3 +17,5 @@ class LLMSettings(BaseSettings):
     local_model_fast: str = "qwen3:8b"
     local_model_standard: str = "qwen3:14b"
     local_model_strong: str = "qwen3:14b"
+    local_num_ctx: int = 16384
+    local_think: bool = False

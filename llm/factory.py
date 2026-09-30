@@ -18,6 +18,8 @@ def create_backend(settings: LLMSettings | None = None) -> LLMBackend:
                     "standard": settings.local_model_standard,
                     "strong": settings.local_model_strong,
                 },
+                num_ctx=settings.local_num_ctx,
+                think=settings.local_think,
             )
         case name:
             raise NotImplementedError(f"LLMバックエンド {name!r} は未実装です")

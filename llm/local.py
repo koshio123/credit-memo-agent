@@ -27,11 +27,19 @@ class OllamaBackend:
         self,
         base_url: str,
         models: dict[Tier, str],
+        num_ctx: int = 16384,
+        think: bool = False,
         client: httpx.AsyncClient | None = None,
         timeout: float = 300.0,
     ) -> None:
+        """
+        num_ctx: コンテキスト長。Ollama の既定は短く、超えた分のプロンプトは黙って切り捨てられる。
+        think: Qwen3 などの思考モード。思考トークンも max_tokens を消費するので、既定はオフ。
+        """
         self._base_url = base_url.rstrip("/")
         self._models = models
+        self.num_ctx = num_ctx
+        self.think = think
         self._client = client or httpx.AsyncClient(timeout=timeout)
 
     def model_for(self, tier: Tier) -> str:
@@ -46,7 +54,12 @@ class OllamaBackend:
             "model": model,
             "messages": messages,
             "stream": False,
-            "options": {"temperature": request.temperature, "num_predict": request.max_tokens},
+            "think": self.think,
+            "options": {
+                "temperature": request.temperature,
+                "num_predict": request.max_tokens,
+                "num_ctx": self.num_ctx,
+            },
         }
 
         try:
@@ -62,6 +75,12 @@ class OllamaBackend:
             parsed = _ChatResponse.model_validate_json(res.content)
         except ValidationError as e:
             raise LLMBackendError(f"Ollama の応答を解釈できません: {e}") from e
+        if parsed.prompt_eval_count >= self.num_ctx:
+            # 入力が上限に達している。先頭が切り捨てられた状態で、もっともらしい答えが返っている
+            raise LLMBackendError(
+                f"プロンプトが num_ctx={self.num_ctx} に達しました。入力が切り捨てられた可能性が"
+                "あるため応答を採用しません。num_ctx を上げるか、入力を減らしてください"
+            )
         return LLMResponse(
             text=parsed.message.content,
             backend=self.name,

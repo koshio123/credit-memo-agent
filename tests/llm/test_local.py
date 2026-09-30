@@ -13,6 +13,7 @@ def _backend(handler: httpx.MockTransport) -> OllamaBackend:
     return OllamaBackend(
         base_url="http://ollama.test",
         models={"fast": "small", "standard": "mid", "strong": "large"},
+        num_ctx=1000,
         client=httpx.AsyncClient(transport=handler),
     )
 
@@ -52,7 +53,8 @@ async def test_リクエストを組み立てて応答を読む() -> None:
             {"role": "user", "content": "要約して"},
         ],
         "stream": False,
-        "options": {"temperature": 0.2, "num_predict": 256},
+        "think": False,
+        "options": {"temperature": 0.2, "num_predict": 256, "num_ctx": 1000},
     }
     assert res.text == "自己資本比率は45.3%です。"
     assert (res.backend, res.model) == ("local", "large")
@@ -111,3 +113,32 @@ async def test_打ち切られた応答にはtruncatedを立てる(
     res = await backend.complete(LLMRequest(messages=[Message(role="user", content="x")]))
 
     assert res.truncated is truncated
+
+
+async def test_プロンプトがnum_ctxに達したら黙って切り詰められた可能性としてエラーにする() -> None:
+    payload = {
+        "message": {"role": "assistant", "content": "もっともらしい答え"},
+        "prompt_eval_count": 1000,  # num_ctx=1000 に達している
+    }
+    backend = _backend(httpx.MockTransport(lambda _: httpx.Response(200, json=payload)))
+
+    with pytest.raises(LLMBackendError, match="num_ctx"):
+        await backend.complete(LLMRequest(messages=[Message(role="user", content="x")]))
+
+
+async def test_thinkの設定をそのまま送る() -> None:
+    bodies: list[dict[str, object]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content))
+        return httpx.Response(200, json={"message": {"role": "assistant", "content": "ok"}})
+
+    backend = OllamaBackend(
+        base_url="http://ollama.test",
+        models={"fast": "s", "standard": "m", "strong": "l"},
+        think=True,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    await backend.complete(LLMRequest(messages=[Message(role="user", content="x")]))
+
+    assert bodies[0]["think"] is True
