@@ -7,10 +7,17 @@ EDINETの有価証券報告書から、出典付きの与信メモ草案を生�
 ```bash
 uv sync                          # 依存のインストール
 docker compose up -d --wait      # PostgreSQL（pgvector + pg_bigm）を起動
-uv run pytest                    # テスト（LLMを呼ぶものは含まない）
+uv run pytest                    # テスト（LLMを呼ぶものは含まない。DB が要るテストは db マーク、DB が無ければスキップ）
 uv run ruff check . && uv run ruff format --check .
 uv run pyright                   # 型チェック（strict）
 uv run pre-commit run --all-files
+
+# 取り込みと評価。前提: EDINET_API_KEY を .env に設定し、scripts.fetch_filings でデータを取得済みで、
+# docker compose up -d --wait で PostgreSQL が起動していること（手順は docs/setup.md §8）
+uv run python -m scripts.ingest_index     # チャンク分け・埋め込み・DB への保存
+uv run python -m scripts.eval_l1_pdfplumber
+uv run python -m scripts.eval_l2          # 結果は evals/reports/
+uv run python -m edinet_mcp               # MCP サーバー（stdio）
 ```
 
 ## 規約
