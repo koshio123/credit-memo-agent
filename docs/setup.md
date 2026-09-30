@@ -88,7 +88,7 @@ brew install ollama          # 0.35.0
 - **`.git/hooks/pre-commit`**: `uv run pre-commit install` で入る。クローンし直したら再実行が必要。
 - **`.git/info/exclude`**: 公開しない個人メモ 1 ファイルを追跡対象から外す一行（ファイル名はそちらを参照）。`.gitignore` に書くと公開リポジトリにファイル名が残るので、こちらに書いた。クローンしても引き継がれない。
 - **`.env`**: `.env.example` からコピーして作成済み。`LOCAL_MODEL_STANDARD/STRONG` は 8B に向け、`EDINET_API_KEY` を設定した。git の追跡対象外（`.gitignore`）。キーを表示させないため、編集後は読まない。
-- **リモート**: `origin` は `https://github.com/koshio123/credit-memo-agent.git` に設定されているが、**何もプッシュしていない**。リポジトリが GitHub 側にあるかも未確認。
+- **リモート**: `origin` は `https://github.com/koshio123/credit-memo-agent.git`（**公開**）。2026-09-30 に作成され、先頭の 2 コミット（応募先の文言を消して作り直した後の履歴）がプッシュされ、その時点の GitHub Actions は成功した。以降のコミットは、この記録の後にプッシュした。
 
 ## 4. リポジトリに入れたファイル（コミットされる）
 
@@ -181,6 +181,6 @@ Claude Code 経由を使う場合は、Claude Code に自分のアカウント�
 | Ollama との実機確認 | **完了**（`think`・`done_reason`・入力の切り捨て。結果は decisions.md） |
 | EDINET API キー | 取得・設定済み。確認スクリプトの初回実行でキーが画面に出たが、ユーザーの判断で再発行はしていない。原因は修正済み |
 | 対象企業 10 社の選定 | **完了**（`evals/datasets/companies.json`。経緯と限界は decisions.md） |
-| GitHub へのプッシュ・CI の初回実行 | 未実施 |
+| GitHub へのプッシュ・CI | 先頭 2 コミットは実施・成功済み。以降のコミットのプッシュ後の CI は GitHub Actions で確認する |
 | `edinet-mcp` と Agent SDK の接続 | W2 で確認 |
 | `anthropic_api` バックエンド | 未実装（選ぶと `NotImplementedError`） |
