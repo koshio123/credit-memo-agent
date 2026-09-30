@@ -1,0 +1,58 @@
+[project]
+name = "credit-memo-agent"
+version = "0.1.0"
+description = "EDINETの有価証券報告書から、出典付きの与信メモ草案を生成するマルチエージェント"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.2",
+    "pyright>=1.1.414",
+    "pytest>=9.1.1",
+    "ruff>=0.16.9",
+]
+
+# アプリケーションであり配布はしない。ルート直下のパッケージ（agents/, llm/ など）をそのままimportする。
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["web", "data"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "B",        # bugbear
+    "UP",       # pyupgrade
+    "SIM",      # simplify
+    "RUF",      # ruff固有
+    "S",        # bandit（秘密情報・危険な呼び出し）
+    "T20",      # print禁止（ログはloggingを使う）
+    "PTH",      # os.pathよりpathlib
+]
+ignore = [
+    "RUF001", "RUF002", "RUF003",  # 日本語の全角文字を含む文字列・コメントを許可
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]  # テストではassertを使う
+
+[tool.pyright]
+include = ["."]
+exclude = ["**/.venv", "**/node_modules", "web", "data"]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests", "evals"]
+addopts = "-ra --strict-markers"
+markers = [
+    "llm: 実際にLLMを呼ぶテスト（CIでは実行しない）",
+]
