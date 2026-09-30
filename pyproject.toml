@@ -3,7 +3,7 @@ name = "credit-memo-agent"
 version = "0.1.0"
 description = "EDINETの有価証券報告書から、出典付きの与信メモ草案を生成するマルチエージェント"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "httpx>=0.28.1",
     "pydantic>=2.13.5",
@@ -24,7 +24,7 @@ package = false
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py314"
 extend-exclude = ["web", "data"]
 
 [tool.ruff.lint]
@@ -50,7 +50,7 @@ ignore = [
 [tool.pyright]
 include = ["."]
 exclude = ["**/.venv", "**/node_modules", "web", "data"]
-pythonVersion = "3.12"
+pythonVersion = "3.14"
 typeCheckingMode = "strict"
 
 [tool.pytest.ini_options]

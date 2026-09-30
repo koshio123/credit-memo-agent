@@ -10,7 +10,7 @@ EDINETの有価証券報告書（以下、有報）から、出典付きの与�
 | デモ形態 | **事前生成したメモ5社分＋デモ動画**（ライブデモは置かない） |
 | README | **日本語** |
 | 期間・工数 | 5週間、週10〜15時間（計50〜75時間） |
-| 開発環境 | Apple M4 Pro / 24GB、Python 3.12、Docker、PostgreSQL 17 |
+| 開発環境 | Apple M4 Pro / 24GB、Python 3.14、Docker、PostgreSQL 17 |
 
 ## 1. ゴールと方針
 

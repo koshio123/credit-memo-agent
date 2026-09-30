@@ -73,7 +73,7 @@ class CachedBackend:
             return None
         try:
             return LLMResponse.model_validate_json(path.read_text(encoding="utf-8"))
-        except (ValidationError, ValueError, OSError):
+        except ValidationError, ValueError, OSError:
             # UnicodeDecodeError は ValueError の一種
             logger.warning("壊れたキャッシュを無視します: %s", path)
             return None
