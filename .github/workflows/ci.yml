@@ -18,4 +18,5 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run pyright
       # LLMを呼ばないテストだけを実行する
-      - run: uv run pytest -m "not llm"
+      # LLM と PostgreSQL が要るテストは除く
+      - run: uv run pytest -m "not llm and not db"
