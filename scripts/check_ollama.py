@@ -1,6 +1,6 @@
 """Ollama の実機との接続を確認する（CIでは実行しない）。
 
-  uv run python scripts/check_ollama.py
+  uv run python -m scripts.check_ollama
 
 llm/ の実装が前提にしている挙動（think の受理、done_reason、切り捨て検知など）を確かめる。
 """

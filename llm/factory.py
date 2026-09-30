@@ -1,4 +1,5 @@
 from llm.cache import CachedBackend
+from llm.claude_code import ClaudeCodeBackend
 from llm.local import OllamaBackend
 from llm.settings import LLMSettings
 from llm.types import LLMBackend
@@ -20,6 +21,15 @@ def create_backend(settings: LLMSettings | None = None) -> LLMBackend:
                 },
                 num_ctx=settings.local_num_ctx,
                 think=settings.local_think,
+            )
+        case "claude_code":
+            backend = ClaudeCodeBackend(
+                models={
+                    "fast": settings.claude_model_fast,
+                    "standard": settings.claude_model_standard,
+                    "strong": settings.claude_model_strong,
+                },
+                think=settings.claude_think,
             )
         case name:
             raise NotImplementedError(f"LLMバックエンド {name!r} は未実装です")

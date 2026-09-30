@@ -5,6 +5,7 @@ description = "EDINETの有価証券報告書から、出典付きの与信メ�
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "claude-agent-sdk>=0.2.162",
     "httpx>=0.28.1",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",

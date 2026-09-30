@@ -17,6 +17,7 @@ uv run pre-commit run --all-files
 
 - **型**: すべての関数に型ヒントを付ける。pyright の strict を通す。`Any` は境界（外部APIの生のJSONなど）だけに限り、Pydantic モデルで型を付けてから内部に渡す。
 - **LLM呼び出し**: 必ず `llm/` のバックエンド抽象を通す。エージェントやワーカーから SDK を直接呼ばない。応答はキャッシュされる前提で、テストでは実LLMを呼ばない（実際に呼ぶテストは `@pytest.mark.llm`）。
+- **Claude Code 経由（`claude_code`）**: 自分のサブスクリプションのログインで動くため、少量・手動の実行だけに使う。CI・常時稼働では使わない。`ANTHROPIC_API_KEY` を環境に置かない（API課金になるため、バックエンドが作成を拒否する）。評価の反復はローカルLLMで回す。
 - **秘密情報**: APIキーなどは `.env` にだけ置く（gitignore 済み）。コード・テスト・ログ・コミットに含めない。新しい変数は `.env.example` にも追記する。
 - **ログ**: `print` は使わず `logging` を使う（ruff の T20 で検出される）。
 - **パス**: `os.path` ではなく `pathlib` を使う。

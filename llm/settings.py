@@ -19,3 +19,9 @@ class LLMSettings(BaseSettings):
     local_model_strong: str = "qwen3:14b"
     local_num_ctx: int = 16384
     local_think: bool = False
+
+    # Claude Code 経由（自分のサブスクリプションのログイン）。モデルIDは完全なIDで固定する
+    claude_model_fast: str = "claude-haiku-4-5"
+    claude_model_standard: str = "claude-sonnet-5-5"
+    claude_model_strong: str = "claude-opus-5-5"
+    claude_think: bool = False
