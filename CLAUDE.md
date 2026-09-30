@@ -19,6 +19,9 @@ uv run pre-commit run --all-files
 - **LLM呼び出し**: 必ず `llm/` のバックエンド抽象を通す。エージェントやワーカーから SDK を直接呼ばない。応答はキャッシュされる前提で、テストでは実LLMを呼ばない（実際に呼ぶテストは `@pytest.mark.llm`）。
 - **Claude Code 経由（`claude_code`）**: 自分のサブスクリプションのログインで動くため、少量・手動の実行だけに使う。CI・常時稼働では使わない。`ANTHROPIC_API_KEY` を環境に置かない（API課金になるため、バックエンドが作成を拒否する）。評価の反復はローカルLLMで回す。
 - **秘密情報**: APIキーなどは `.env` にだけ置く（gitignore 済み）。コード・テスト・ログ・コミットに含めない。新しい変数は `.env.example` にも追記する。
+  - **HTTPクライアントのログに注意する。** `httpx` は INFO レベルでリクエストのURLを出すため、キーをURLのクエリで渡す API（EDINET など）では、ログにキーが出る。`httpx` と `httpcore` のロガーは WARNING 以上にする。
+  - キーを扱うスクリプトは、実行結果をチャットやログに貼る前提で作る。出力とエラーにキーを出さないテストを書く（例: `tests/scripts/test_check_edinet.py`）。
+  - `.env` は編集後に読まない。キーの有無は、値を伏せた形（`sed` で置換）で確かめる。
 - **ログ**: `print` は使わず `logging` を使う（ruff の T20 で検出される）。
 - **パス**: `os.path` ではなく `pathlib` を使う。
 - **日本語**: コメント・docstring・README・コミットメッセージは日本語。識別子は英語。
