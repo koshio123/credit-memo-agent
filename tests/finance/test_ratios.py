@@ -301,3 +301,64 @@ def test_有利子負債の内訳が未計上なら0として扱う() -> None:
     # 借入金・社債などは、無い会社では XBRL に項目自体が出ない。未計上は0として合計する
     fin = _fin(commercial_paper=None, bonds=None, lease_obligations=None, long_term_borrowings=100)
     assert fin.interest_bearing_debt == D(100)
+
+
+# ---- コードレビューでの指摘への対応 ----
+
+
+def test_有利子負債の内訳がすべて未計上なら抽出漏れの可能性として算定不能にする() -> None:
+    # 全部 None を「借入金ゼロ」とみなすと、抽出に失敗した会社が「0年・標準」という最良の評価になる
+    fin = _fin(
+        short_term_borrowings=None,
+        commercial_paper=None,
+        current_portion_long_term_borrowings=None,
+        current_portion_bonds=None,
+        bonds=None,
+        long_term_borrowings=None,
+        lease_obligations=None,
+    )
+    assert fin.interest_bearing_debt is None
+
+    r = _report(fin).debt_repayment_years
+    assert r.value is None
+    assert r.level is None  # 抽出漏れを、財務の良し悪しの評価にしない
+    assert "有利子負債" in (r.unmeasurable_reason or "")
+
+
+def test_支払利息が無いときは断定せず_確認が必要だと書く() -> None:
+    r = _report(_fin(interest_expense=None)).interest_coverage
+    assert r.value is None
+    reason = r.unmeasurable_reason or ""
+    assert "支払利息" in reason
+    assert "支払利息なし" not in reason  # ゼロと断定する文言は使わない
+    assert "確認" in reason
+
+
+def test_表示が境界に丸められても判定と食い違わない_自己資本比率() -> None:
+    # 29.96% は留意。1桁に丸めて「30.0%」と表示すると、標準と読める
+    r = _report(_fin(net_assets=2_996, total_assets=10_000)).equity_ratio
+    assert r.level == Level.CAUTION
+    assert "29.96%" in r.basis
+    assert "30.0%" not in r.basis
+
+
+def test_表示が境界に丸められても判定と食い違わない_債務償還年数() -> None:
+    # 要償還債務10,004 ÷ 償還原資1,000 = 10.004年 は留意。「10.0年」と表示すると標準と読める
+    r = _report(_fin(long_term_borrowings=11_504)).debt_repayment_years
+    assert r.level == Level.CAUTION
+    assert "10.004年" in r.basis
+    assert "10.0年" not in r.basis
+
+
+def test_通常の値は小数1桁で表示する() -> None:
+    r = _report(_fin(net_assets=4_100, total_assets=10_000)).equity_ratio
+    assert "41.0%" in r.basis
+
+
+def test_表示が境界に丸められても判定と食い違わない_売上高の減少() -> None:
+    # 前期10,000 → 当期9,004 は -9.96%。第11条は該当しない。「-10.0%」と表示すると該当と読める
+    report = _report(_fin(net_sales=9_004), _fin(net_sales=10_000))
+    assert report.sales_drop.applies is False
+    assert "-9.96%" in report.sales_growth.basis
+    assert "-10.0%" not in report.sales_growth.basis
+    assert "-10.0%" not in report.sales_drop.basis

@@ -8,6 +8,7 @@
 - 算式の入力値と算定過程は、第7条に従い basis（計算根拠）に併記する。
 """
 
+from collections.abc import Callable
 from decimal import Decimal
 from enum import StrEnum
 
@@ -30,7 +31,8 @@ class PeriodFinancials(BaseModel):
 
     項目が無いことと、値がゼロであることは区別する。無い項目を0とみなして比率を計算すると、
     もっともらしい誤った数値が出るため、比率は「入力なし」として算定不能にする。
-    例外は有利子負債の内訳: 借入金や社債のない会社では項目自体が出ないので、0として合計する。
+    例外は有利子負債の内訳と受取利息・受取配当金: 無い会社では項目自体が出ないので、0として扱う。
+    ただし有利子負債の内訳がすべて無い場合は、抽出漏れと区別できないため算定不能にする。
     """
 
     model_config = ConfigDict(frozen=True)
@@ -61,8 +63,13 @@ class PeriodFinancials(BaseModel):
     depreciation: Decimal | None = None  # 減価償却費
 
     @property
-    def interest_bearing_debt(self) -> Decimal:
-        """有利子負債（附則第1条第1項）。未計上の内訳は0として合計する。"""
+    def interest_bearing_debt(self) -> Decimal | None:
+        """有利子負債（附則第1条第1項）。
+
+        一部の内訳が未計上なら0として合計する。**すべて未計上なら None**（算定できない）。
+        すべて0とみなすと、抽出に失敗した会社が「無借金」の最良の評価になってしまうため。
+        本当に借入のない会社は、呼び出し側が0を明示する。
+        """
         parts = (
             self.short_term_borrowings,
             self.commercial_paper,
@@ -72,7 +79,8 @@ class PeriodFinancials(BaseModel):
             self.long_term_borrowings,
             self.lease_obligations,
         )
-        return sum((p for p in parts if p is not None), ZERO)
+        present = [p for p in parts if p is not None]
+        return sum(present, ZERO) if present else None
 
 
 class RatioResult(BaseModel):
@@ -117,8 +125,16 @@ def _yen(x: Decimal) -> str:
     return f"{x:,.0f}"
 
 
-def _num(x: Decimal, digits: int = 1) -> str:
-    return f"{x:,.{digits}f}"
+def _show(value: Decimal, classify: Callable[[Decimal], object] | None = None) -> str:
+    """値を、小数1桁から始めて、丸めても判定（classify）が変わらない最小の桁数で表示する。
+
+    29.96% を「30.0%」と丸めると、留意なのに標準と読める。判定が変わる場合は桁を増やす。
+    """
+    for digits in range(1, 9):
+        rounded = value.quantize(Decimal(1).scaleb(-digits))
+        if classify is None or classify(rounded) == classify(value):
+            return f"{rounded:,.{digits}f}"
+    return f"{value:,.8f}"
 
 
 # ---- 水準の判定（第8条） ----
@@ -140,6 +156,19 @@ def _level_at_most(value: Decimal, standard: str, caution: str) -> Level:
     if value <= Decimal(caution):
         return Level.CAUTION
     return Level.SCRUTINY
+
+
+def _at_least(standard: str, caution: str) -> Callable[[Decimal], Level]:
+    return lambda v: _level_at_least(v, standard, caution)
+
+
+def _at_most(standard: str, caution: str) -> Callable[[Decimal], Level]:
+    return lambda v: _level_at_most(v, standard, caution)
+
+
+def _is_sales_drop(growth_pct: Decimal) -> bool:
+    """第11条: 売上高成長率が－10%以下。"""
+    return growth_pct <= Decimal(-10)
 
 
 # ---- 算定不能の組み立て ----
@@ -176,12 +205,16 @@ def _equity_ratio(f: PeriodFinancials) -> RatioResult:
     if f.total_assets <= ZERO:
         return _unmeasurable(name, unit, f"総資産がゼロ以下（{_yen(f.total_assets)}）")
     value = f.net_assets / f.total_assets * HUNDRED
+    level_of = _at_least("30", "20")
     return RatioResult(
         name=name,
         unit=unit,
         value=value,
-        level=_level_at_least(value, "30", "20"),
-        basis=f"純資産 {_yen(f.net_assets)} ÷ 総資産 {_yen(f.total_assets)} = {_num(value)}%",
+        level=level_of(value),
+        basis=(
+            f"純資産 {_yen(f.net_assets)} ÷ 総資産 {_yen(f.total_assets)}"
+            f" = {_show(value, level_of)}%"
+        ),
     )
 
 
@@ -193,14 +226,15 @@ def _current_ratio(f: PeriodFinancials) -> RatioResult:
     if f.current_liabilities <= ZERO:
         return _unmeasurable(name, unit, f"流動負債がゼロ以下（{_yen(f.current_liabilities)}）")
     value = f.current_assets / f.current_liabilities * HUNDRED
+    level_of = _at_least("120", "100")
     return RatioResult(
         name=name,
         unit=unit,
         value=value,
-        level=_level_at_least(value, "120", "100"),
+        level=level_of(value),
         basis=(
             f"流動資産 {_yen(f.current_assets)} ÷ 流動負債 {_yen(f.current_liabilities)}"
-            f" = {_num(value)}%"
+            f" = {_show(value, level_of)}%"
         ),
     )
 
@@ -214,13 +248,15 @@ def _operating_margin(f: PeriodFinancials) -> RatioResult:
     if f.net_sales <= ZERO:
         return _unmeasurable(name, unit, f"売上高がゼロ以下（{_yen(f.net_sales)}）")
     value = f.operating_income / f.net_sales * HUNDRED
+    level_of = _at_least("3", "1")
     return RatioResult(
         name=name,
         unit=unit,
         value=value,
-        level=_level_at_least(value, "3", "1"),
+        level=level_of(value),
         basis=(
-            f"営業利益 {_yen(f.operating_income)} ÷ 売上高 {_yen(f.net_sales)} = {_num(value)}%"
+            f"営業利益 {_yen(f.operating_income)} ÷ 売上高 {_yen(f.net_sales)}"
+            f" = {_show(value, level_of)}%"
         ),
     )
 
@@ -228,9 +264,16 @@ def _operating_margin(f: PeriodFinancials) -> RatioResult:
 def _interest_coverage(f: PeriodFinancials) -> RatioResult:
     name, unit = "インタレスト・カバレッジ・レシオ", "倍"
     # 受取利息・受取配当金が無い会社は、XBRL にその項目が出ない。営業外収益が無いだけなので0とする
-    if f.operating_income is None or f.interest_expense is None:
-        gaps = _missing({"営業利益": f.operating_income, "支払利息": f.interest_expense})
-        return _no_input(name, unit, gaps)
+    if f.operating_income is None:
+        return _no_input(name, unit, ["営業利益"])
+    if f.interest_expense is None:
+        # 「支払利息なし」（ゼロ）と断定しない。無借金で項目が出ないのか、別の科目で計上されていて
+        # 取れていないのかを区別できない（docs/decisions.md の未解決事項）
+        return _unmeasurable(
+            name,
+            unit,
+            "支払利息の項目がない（ゼロなのか、別の科目で計上されているのか区別できない。確認が必要）",
+        )
     income = f.interest_income or ZERO
     dividend = f.dividend_income or ZERO
     if f.interest_expense == ZERO:
@@ -239,15 +282,16 @@ def _interest_coverage(f: PeriodFinancials) -> RatioResult:
         return _unmeasurable(name, unit, f"支払利息が負（{_yen(f.interest_expense)}）")
     numerator = f.operating_income + income + dividend
     value = numerator / f.interest_expense
+    level_of = _at_least("5", "2")
     return RatioResult(
         name=name,
         unit=unit,
         value=value,
-        level=_level_at_least(value, "5", "2"),
+        level=level_of(value),
         basis=(
             f"（営業利益 {_yen(f.operating_income)} ＋ 受取利息 {_yen(income)}"
             f" ＋ 受取配当金 {_yen(dividend)}）÷ 支払利息 {_yen(f.interest_expense)}"
-            f" = {_num(value)}倍"
+            f" = {_show(value, level_of)}倍"
         ),
     )
 
@@ -265,6 +309,10 @@ def _debt_repayment_years(f: PeriodFinancials) -> RatioResult:
         return _no_input(name, unit, gaps)
     working_capital = f.trade_receivables + f.inventories - f.trade_payables  # 正常運転資金
     debt = f.interest_bearing_debt
+    if debt is None:
+        return _unmeasurable(
+            name, unit, "有利子負債の内訳がすべて未計上（抽出漏れの可能性。確認が必要）"
+        )
     to_repay = debt - working_capital  # 要償還債務
     debt_text = (
         f"有利子負債 {_yen(debt)} － 正常運転資金 {_yen(working_capital)}"
@@ -306,12 +354,13 @@ def _debt_repayment_years(f: PeriodFinancials) -> RatioResult:
             level=Level.SCRUTINY,
         )
     value = to_repay / cash_flow
+    level_of = _at_most("10", "15")
     return RatioResult(
         name=name,
         unit=unit,
         value=value,
-        level=_level_at_most(value, "10", "15"),
-        basis=f"{debt_text}。{cf_text}。要償還債務 ÷ 償還原資 = {_num(value)}年",
+        level=level_of(value),
+        basis=f"{debt_text}。{cf_text}。要償還債務 ÷ 償還原資 = {_show(value, level_of)}年",
     )
 
 
@@ -332,7 +381,7 @@ def _sales_growth(current: PeriodFinancials, previous: PeriodFinancials | None) 
         level=None,  # 成長率には第8条の水準の区分がない（第11条の留意事項だけ）
         basis=(
             f"当期売上高 {_yen(current.net_sales)} ÷ 前期売上高 {_yen(previous.net_sales)}"
-            f" － 1 = {_num(value)}%"
+            f" － 1 = {_show(value, _is_sales_drop)}%"
         ),
     )
 
@@ -348,8 +397,8 @@ def _sales_drop(growth: RatioResult) -> FlagResult:
     return FlagResult(
         name=name,
         clause=clause,
-        applies=growth.value <= Decimal(-10),
-        basis=f"売上高成長率 {_num(growth.value)}%（－10%以下で該当）",
+        applies=_is_sales_drop(growth.value),
+        basis=f"売上高成長率 {_show(growth.value, _is_sales_drop)}%（－10%以下で該当）",
     )
 
 
