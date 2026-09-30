@@ -180,7 +180,7 @@ Claude Code 経由を使う場合は、Claude Code に自分のアカウント�
 | --- | --- |
 | Ollama との実機確認 | **完了**（`think`・`done_reason`・入力の切り捨て。結果は decisions.md） |
 | EDINET API キー | 取得・設定済み。確認スクリプトの初回実行でキーが画面に出たが、ユーザーの判断で再発行はしていない。原因は修正済み |
-| 対象企業 10 社の選定 | 作業中 |
+| 対象企業 10 社の選定 | **完了**（`evals/datasets/companies.json`。経緯と限界は decisions.md） |
 | GitHub へのプッシュ・CI の初回実行 | 未実施 |
 | `edinet-mcp` と Agent SDK の接続 | W2 で確認 |
 | `anthropic_api` バックエンド | 未実装（選ぶと `NotImplementedError`） |

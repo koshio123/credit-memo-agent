@@ -142,8 +142,8 @@ credit-memo-agent/
 
 ## 9. W0 の作業リスト
 
-- [ ] EDINET API キーを取得し、対象企業10社を選ぶ（製造・小売・サービス・建設・不動産などに分散させる）
-- [ ] Ollama を導入し、候補モデル（テキスト用・VLM用）を落として日本語の簡単な動作を確認する
+- [x] EDINET API キーを取得し、対象企業10社を選ぶ（結果は evals/datasets/companies.json）
+- [x] Ollama を導入し、テキスト用モデル（qwen3:8b）で日本語の動作を確認する（VLM は W1 で必要になったら取得する）
 - [x] Claude Agent SDK を Pro ログインで動かせることと、規約上の扱いを確認する（結果は docs/decisions.md）
 - [ ] `edinet-mcp` を Agent SDK に接続できるか確認する（W2 で MCP を実装するときに行う）
 - [x] リポジトリの骨格と Docker Compose（PostgreSQL + pgvector + pg_bigm）を作る

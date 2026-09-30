@@ -1,0 +1,275 @@
+{
+  "selected_on": "2026-09-30",
+  "companies": [
+    {
+      "sec_code": "6744",
+      "edinet_code": "E01803",
+      "name": "能美防災",
+      "industry": "電気機器",
+      "fiscal_year_end": "3月31日",
+      "capital_million_yen": 13302,
+      "filings": {
+        "current": {
+          "doc_id": "S100YHTN",
+          "period_end": "2026-03-31",
+          "submitted": "2026-06-24"
+        },
+        "previous": {
+          "doc_id": "S100W3FC",
+          "period_end": "2025-03-31",
+          "submitted": "2025-06-25"
+        }
+      },
+      "why_selected": "健全ケース。自己資本比率76%・流動比率335%・営業利益率13%で、3指標とも標準水準。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。正解データはW1でXBRLから算出し直す",
+        "equity_ratio_pct": 76.4,
+        "current_ratio_pct": 335,
+        "operating_margin_pct": 13.1
+      }
+    },
+    {
+      "sec_code": "1969",
+      "edinet_code": "E00149",
+      "name": "高砂熱学工業",
+      "industry": "建設業",
+      "fiscal_year_end": "3月31日",
+      "capital_million_yen": 13134,
+      "filings": {
+        "current": {
+          "doc_id": "S100YDOU",
+          "period_end": "2026-03-31",
+          "submitted": "2026-06-18"
+        },
+        "previous": {
+          "doc_id": "S100VYJS",
+          "period_end": "2025-03-31",
+          "submitted": "2025-06-17"
+        }
+      },
+      "why_selected": "標準水準の建設業。自己資本比率56%、営業利益率11%。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。正解データはW1でXBRLから算出し直す",
+        "equity_ratio_pct": 56.3,
+        "current_ratio_pct": 181,
+        "operating_margin_pct": 11.3
+      }
+    },
+    {
+      "sec_code": "8892",
+      "edinet_code": "E03992",
+      "name": "エスコン",
+      "industry": "不動産業",
+      "fiscal_year_end": "3月31日",
+      "capital_million_yen": 16519,
+      "filings": {
+        "current": {
+          "doc_id": "S100YGKW",
+          "period_end": "2026-03-31",
+          "submitted": "2026-06-23"
+        },
+        "previous": {
+          "doc_id": "S100W2BR",
+          "period_end": "2025-03-31",
+          "submitted": "2025-06-24"
+        }
+      },
+      "why_selected": "自己資本比率が要精査水準（17%）。一方で営業利益率は19%と高く、指標の向きが食い違うケース。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。正解データはW1でXBRLから算出し直す",
+        "equity_ratio_pct": 16.9,
+        "current_ratio_pct": 405,
+        "operating_margin_pct": 19.0
+      }
+    },
+    {
+      "sec_code": "9024",
+      "edinet_code": "E04154",
+      "name": "西武ホールディングス",
+      "industry": "陸運業",
+      "fiscal_year_end": "3月31日",
+      "capital_million_yen": 50000,
+      "filings": {
+        "current": {
+          "doc_id": "S100YEFI",
+          "period_end": "2026-03-31",
+          "submitted": "2026-06-19"
+        },
+        "previous": {
+          "doc_id": "S100W1OD",
+          "period_end": "2025-03-31",
+          "submitted": "2025-06-23"
+        }
+      },
+      "why_selected": "流動比率が要精査水準（42%）。自己資本比率は33%で標準水準。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。正解データはW1でXBRLから算出し直す",
+        "equity_ratio_pct": 33.2,
+        "current_ratio_pct": 42,
+        "operating_margin_pct": 8.9
+      }
+    },
+    {
+      "sec_code": "7128",
+      "edinet_code": "E36707",
+      "name": "ユニソルホールディングス",
+      "industry": "卸売業",
+      "fiscal_year_end": "12月31日",
+      "capital_million_yen": 5000,
+      "filings": {
+        "current": {
+          "doc_id": "S100XU07",
+          "period_end": "2025-12-31",
+          "submitted": "2026-03-26"
+        },
+        "previous": {
+          "doc_id": "S100VI7U",
+          "period_end": "2024-12-31",
+          "submitted": "2025-03-28"
+        }
+      },
+      "why_selected": "12月決算で、提出時期が他社（3月決算）と異なる。営業利益率が留意水準（2.1%）。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。正解データはW1でXBRLから算出し直す",
+        "equity_ratio_pct": 63.1,
+        "current_ratio_pct": 203,
+        "operating_margin_pct": 2.1
+      }
+    },
+    {
+      "sec_code": "9742",
+      "edinet_code": "E04803",
+      "name": "アイネス",
+      "industry": "情報・通信業",
+      "fiscal_year_end": "3月31日",
+      "capital_million_yen": 15000,
+      "filings": {
+        "current": {
+          "doc_id": "S100YF4O",
+          "period_end": "2026-03-31",
+          "submitted": "2026-06-22"
+        },
+        "previous": {
+          "doc_id": "S100W3UM",
+          "period_end": "2025-03-31",
+          "submitted": "2025-06-25"
+        }
+      },
+      "why_selected": "営業損失（営業利益率マイナス1.8%）。規程 第10条は2期連続が条件なので、前期の状況はW1で確認する。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。正解データはW1でXBRLから算出し直す",
+        "equity_ratio_pct": 74.9,
+        "current_ratio_pct": 321,
+        "operating_margin_pct": -1.8
+      }
+    },
+    {
+      "sec_code": "4228",
+      "edinet_code": "E00845",
+      "name": "積水化成品工業",
+      "industry": "化学",
+      "fiscal_year_end": "3月31日",
+      "capital_million_yen": 16533,
+      "filings": {
+        "current": {
+          "doc_id": "S100YI2M",
+          "period_end": "2026-03-31",
+          "submitted": "2026-06-23"
+        },
+        "previous": {
+          "doc_id": "S100W5Z6",
+          "period_end": "2025-03-31",
+          "submitted": "2025-06-25"
+        }
+      },
+      "why_selected": "営業利益率が留意水準（2.2%）。流動比率は129%で標準水準の下限に近い。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。正解データはW1でXBRLから算出し直す",
+        "equity_ratio_pct": 41.6,
+        "current_ratio_pct": 129,
+        "operating_margin_pct": 2.2
+      }
+    },
+    {
+      "sec_code": "2281",
+      "edinet_code": "E00335",
+      "name": "プリマハム",
+      "industry": "食料品",
+      "fiscal_year_end": "3月31日",
+      "capital_million_yen": 7908,
+      "filings": {
+        "current": {
+          "doc_id": "S100YDH8",
+          "period_end": "2026-03-31",
+          "submitted": "2026-06-24"
+        },
+        "previous": {
+          "doc_id": "S100W0KK",
+          "period_end": "2025-03-31",
+          "submitted": "2025-06-24"
+        }
+      },
+      "why_selected": "営業利益率が留意水準（1.9%）。流動比率は121%で標準水準の下限に近い。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。正解データはW1でXBRLから算出し直す",
+        "equity_ratio_pct": 54.1,
+        "current_ratio_pct": 121,
+        "operating_margin_pct": 1.9
+      }
+    },
+    {
+      "sec_code": "2730",
+      "edinet_code": "E03399",
+      "name": "エディオン",
+      "industry": "小売業",
+      "fiscal_year_end": "3月31日",
+      "capital_million_yen": 11940,
+      "filings": {
+        "current": {
+          "doc_id": "S100YDWB",
+          "period_end": "2026-03-31",
+          "submitted": "2026-06-23"
+        },
+        "previous": {
+          "doc_id": "S100W5A2",
+          "period_end": "2025-03-31",
+          "submitted": "2025-06-26"
+        }
+      },
+      "why_selected": "標準水準の小売業。営業利益率は3.2%で標準水準の下限に近い。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。正解データはW1でXBRLから算出し直す",
+        "equity_ratio_pct": 54.2,
+        "current_ratio_pct": 147,
+        "operating_margin_pct": 3.2
+      }
+    },
+    {
+      "sec_code": "9744",
+      "edinet_code": "E04804",
+      "name": "メイテックグループホールディングス",
+      "industry": "サービス業",
+      "fiscal_year_end": "3月31日",
+      "capital_million_yen": 5000,
+      "filings": {
+        "current": {
+          "doc_id": "S100YE6X",
+          "period_end": "2026-03-31",
+          "submitted": "2026-06-22"
+        },
+        "previous": {
+          "doc_id": "S100VYUN",
+          "period_end": "2025-03-31",
+          "submitted": "2025-06-18"
+        }
+      },
+      "why_selected": "標準水準のサービス業（人材）。営業利益率14.5%、資産の軽い事業。",
+      "selection_snapshot": {
+        "note": "選定時の概算（連結、直近期）。正解データはW1でXBRLから算出し直す",
+        "equity_ratio_pct": 54.3,
+        "current_ratio_pct": 297,
+        "operating_margin_pct": 14.5
+      }
+    }
+  ]
+}
