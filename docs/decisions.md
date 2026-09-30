@@ -179,7 +179,7 @@
   - 停止理由は `ResultMessage.stop_reason` から取る（`AssistantMessage.stop_reason` は `None` だった）。
   - SDK は Anthropic の CLI を同梱していて、無改変のまま使われる。
 - **諦めたこと**: 複数ターンの履歴（単発の呼び出しのみ対応）。エージェントの呼び出しは当面単発で足りる。必要になったら、履歴を1つのプロンプトに整形する方式で足す。
-- **未確認**: `edinet-mcp` を Agent SDK に接続できるか（MCP を実装するW2で確認する）。
+- **`edinet-mcp` との接続**: W2 で確認済み（Agent SDK から MCP のツールが呼べた。上の edinet-mcp の項目）。ただし、この `llm/` のバックエンドは組み込みツールなしの単発生成で、エージェントがツールを使う方法は W3 で決める（PLAN.md 9-4）。
 
 ## 2026-09-30 架空の融資内規と与信メモのテンプレート
 
@@ -231,4 +231,4 @@
 
 - **決定**: Claude Pro の範囲内で作る。Claude Code 経由（Agent SDK）とローカルLLM（Ollama）を切り替えられるようにする。Anthropic API は使わない。
 - **理由**: 追加のAPI課金を避けるため。Pro には API 利用枠が含まれない。
-- **未確認**: Agent SDK をサブスクリプション認証で使うことの規約上の扱い。W0 中に確認する。
+- **規約上の扱い**: 確認済み（上の「Claude Code（Agent SDK）経由のバックエンド」）。

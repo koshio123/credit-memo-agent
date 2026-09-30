@@ -10,7 +10,7 @@
 | --- | --- | --- | --- |
 | 1 | uv と Python 3.14.7 | `~/.local/`（uv 管理） | マシンの環境 |
 | 2 | Homebrew の `ollama` 0.35.0 | `/opt/homebrew/` | マシンの環境 |
-| 3 | Ollama のモデル（`qwen3:8b`、取得中） | `~/.ollama/` | マシンの環境 |
+| 3 | Ollama のモデル（`qwen3:8b`、取得済み） | `~/.ollama/` | マシンの環境 |
 | 4 | Docker イメージ・ボリューム | Docker Desktop の内部 | マシンの環境 |
 | 5 | Python の依存パッケージ | リポジトリの `.venv/` | リポジトリ（gitignore） |
 | 6 | pre-commit のフック | `.git/hooks/pre-commit` | リポジトリ（コミットされない） |
@@ -48,7 +48,7 @@ brew install ollama          # 0.35.0
 | --- | --- | --- | --- |
 | `qwen3:8b` | 開発中の反復、形式・配線の確認 | 5.2GB | **取得済み**（2026-09-30。回線が遅く、途中で何度も止まったため、監視スクリプトで取得をやり直しながら進めた） |
 | `qwen3:14b` | 分析・起草 | 約 9GB | **未取得**（後回しにした） |
-| VLM（Qwen2.5-VL 7B 級） | PDF の図表の読み取り | 未定 | **未取得**（W1 で必要になったら取得する） |
+| VLM（Qwen2.5-VL 7B 級） | PDF の図表の読み取り | 未定 | **未取得**（基準線が財務数値で飽和したため保留。本文・表の読み取りの評価を作るときに判断する） |
 
 注意:
 
@@ -137,6 +137,10 @@ brew install ollama          # 0.35.0
 | `pydantic` 2.13 / `pydantic-settings` 2.15 | 型付きのデータと、環境変数・`.env` からの設定 |
 | `httpx` 0.28 | Ollama への HTTP 呼び出し |
 | `claude-agent-sdk` 0.2.162 | Claude Code 経由の呼び出し。Anthropic の CLI を同梱している |
+| `mcp` 2.2 | MCP サーバーとクライアント（`edinet_mcp/`）。2.x では `FastMCP` が `MCPServer` に改名されている |
+| `psycopg` 3.3 / `pgvector` 0.5 | PostgreSQL への接続と、ベクトル型の読み書き |
+| `sentence-transformers` 6.1（PyTorch 2.14） | 埋め込みモデル（e5-small、ruri-v3-30m）の実行。Apple Silicon では MPS を使う |
+| `pdfplumber` 0.11 | PDF の本文の取り出し（基準線） |
 
 開発時（`dev` グループ）: `ruff` 0.16.9、`pyright` 1.1.414、`pytest` 9.1.1、`pre-commit` 4.6.2。
 
@@ -160,7 +164,7 @@ brew install ollama          # 0.35.0
 | `CLAUDE_MODEL_FAST/STANDARD/STRONG`、`CLAUDE_THINK` | Claude 側のモデル（完全な ID で固定）と思考モード |
 | `LLM_CACHE_ENABLED`、`LLM_CACHE_DIR` | 応答キャッシュ（既定は有効、`.cache/llm`） |
 | `POSTGRES_*`、`DATABASE_URL` | PostgreSQL の接続情報（ポートは 5433） |
-| `EDINET_API_KEY` | EDINET API v2 のキー。**未取得** |
+| `EDINET_API_KEY` | EDINET API v2 のキー（取得・設定済み。`.env` にだけ置く） |
 
 **`ANTHROPIC_API_KEY` と `ANTHROPIC_AUTH_TOKEN` は環境に置かない。** あると Claude Code が API 課金で動くため、`claude_code` バックエンドが作成を拒否する。
 
@@ -183,6 +187,18 @@ uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run 
 
 Claude Code 経由を使う場合は、Claude Code に自分のアカウントでログインしておく（API キーは不要）。
 
+データの取得から検索の評価まで（書類は `data/` に置かれ、コミットされない。埋め込みモデルの初回取得に時間がかかる）:
+
+```bash
+uv run python -m scripts.fetch_filings                      # 開発用10社（EDINET_API_KEY が要る）
+uv run python -m scripts.fetch_filings --dataset heldout    # 保留データ10社
+uv run python -m scripts.build_ground_truth  # XBRL から L1 の正解データ（開発用）
+uv run python -m scripts.eval_l1_pdfplumber  # L1 評価（PDF の抽出精度）。--dataset heldout で保留データ
+uv run python -m scripts.ingest_index        # チャンク分け・埋め込み・DB への保存（約2分）
+uv run python -m scripts.eval_l2             # L2 評価（検索）。結果は evals/reports/
+uv run python -m scripts.check_edinet_mcp    # MCP サーバーを stdio で起動して確認
+```
+
 ## 9. 未完了・未確認
 
 | 項目 | 状態 |
@@ -190,6 +206,8 @@ Claude Code 経由を使う場合は、Claude Code に自分のアカウント�
 | Ollama との実機確認 | **完了**（`think`・`done_reason`・入力の切り捨て。結果は decisions.md） |
 | EDINET API キー | 取得・設定済み。確認スクリプトの初回実行でキーが画面に出たが、ユーザーの判断で再発行はしていない。原因は修正済み |
 | 対象企業 10 社の選定 | **完了**（`evals/datasets/companies.json`。経緯と限界は decisions.md） |
-| GitHub へのプッシュ・CI | 先頭 2 コミットは実施・成功済み。以降のコミットのプッシュ後の CI は GitHub Actions で確認する |
+| GitHub へのプッシュ・CI | W1 の途中までは実施・成功済み。**それ以降（W1 の一部と W2 全体）はローカルのみで、CI は未確認**。W2 で torch / sentence-transformers が依存に入ったので、CI のインストール時間と、`db` マークのテストが除外されること（`pytest -m "not llm and not db"`）を、プッシュ後に確認する |
+| エージェントがツールを使う方法 | **未決**（W3 の最初に決める。PLAN.md 9-4。案は、Worker が決定的なコードでサービス層を呼ぶ方式） |
+| L2 設問の人による確認 | 未実施（質問は Claude が根拠から作った。docs/decisions.md） |
 | `edinet-mcp` と Agent SDK の接続 | **完了**（`scripts/check_mcp_agent.py`。結果は decisions.md） |
 | `anthropic_api` バックエンド | 未実装（選ぶと `NotImplementedError`） |
