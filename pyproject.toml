@@ -10,8 +10,11 @@ dependencies = [
     "claude-agent-sdk>=0.2.162",
     "httpx>=0.28.1",
     "pdfplumber>=0.11.10",
+    "pgvector>=0.5.0",
+    "psycopg[binary]>=3.3.6",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
+    "sentence-transformers>=6.1.0",
 ]
 
 [dependency-groups]
@@ -63,4 +66,5 @@ testpaths = ["tests", "evals"]
 addopts = "-ra --strict-markers"
 markers = [
     "llm: 実際にLLMを呼ぶテスト（CIでは実行しない）",
+    "db: 実際のPostgreSQL（docker compose up -d --wait）が必要なテスト。DBが無ければスキップ",
 ]

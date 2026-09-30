@@ -78,7 +78,11 @@ brew install ollama          # 0.35.0
 - 拡張の作成は、データディレクトリが空の初回起動でしか走らない。`docker/postgres/init/` を変えたら `docker compose down -v` でボリュームを消す。
 - 元に戻す: `docker compose down -v && docker rmi credit-memo-agent-db:local`。
 
-### 2.5 pre-commit のキャッシュ
+### 2.5 埋め込みモデル（Hugging Face のキャッシュ）
+
+`multilingual-e5-small`（`intfloat/`）と `ruri-v3-30m`（`cl-nagoya/`）が `~/.cache/huggingface/hub/` に入っている。`scripts/ingest_index.py` の初回実行で取得される。消しても再取得される（回線が遅いので時間がかかる）。取り込み後の DB は Docker のボリュームにあり、`docker compose down -v` で消える（その場合は `uv run python -m scripts.ingest_index` で作り直す。約2分）。
+
+### 2.6 pre-commit のキャッシュ
 
 `pre-commit-hooks`（外部リポジトリ）の環境が `~/.cache/pre-commit/` に作られた。消しても再作成される。
 
@@ -114,7 +118,9 @@ brew install ollama          # 0.35.0
 | --- | --- |
 | `docker-compose.yml`、`docker/postgres/` | PostgreSQL（pgvector + pg_bigm）の環境 |
 | `llm/` | LLM 呼び出しの抽象（型、キャッシュ、Ollama、Claude Code、テスト用の偽バックエンド、設定、ファクトリ） |
-| `tests/` | 上記のテスト（42 件） |
+| `retrieval/` | 本文のチャンク分け、埋め込み、BM25、RRF、PostgreSQL への保存と検索、取り込み |
+| `evals/l2.py`、`scripts/ingest_index.py`、`scripts/eval_l2.py` | 検索の評価（L2）と、取り込み・評価のコマンド。`uv run python -m scripts.<名前>` で実行 |
+| `tests/` | 上記のテスト。DB が要るものは `-m db`（CI では除く） |
 | `scripts/check_ollama.py`、`scripts/check_claude_code.py` | 実機との接続確認。CI では実行しない。`uv run python -m scripts.<名前>` で実行 |
 | `policies/credit_policy.md` | **架空の**融資内規（条文番号付き。財務指標の算式と境界値を附則で定義） |
 | `templates/credit_memo.md` | 与信メモの雛形 |

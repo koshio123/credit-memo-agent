@@ -80,7 +80,11 @@ def _split_long_line(line: str, max_chars: int) -> list[str]:
     return pieces
 
 
-def chunk_pages(doc_id: str, pages: list[str], max_chars: int = 800) -> list[Chunk]:
+# e5-small の入力上限（512トークン）に収まる最大の大きさ。800文字では5〜8%が上限を超えた（実測）
+DEFAULT_MAX_CHARS = 600
+
+
+def chunk_pages(doc_id: str, pages: list[str], max_chars: int = DEFAULT_MAX_CHARS) -> list[Chunk]:
     """ページごとの本文（1始まりのページ番号は並び順）を、チャンクに分ける。"""
     if not doc_id:
         raise ValueError("doc_id が空です")
