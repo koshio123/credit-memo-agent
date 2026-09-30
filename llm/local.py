@@ -15,6 +15,7 @@ class _ChatResponse(BaseModel):
     model: str | None = None
     prompt_eval_count: int = 0
     eval_count: int = 0
+    done_reason: str | None = None  # "length" は max_tokens での打ち切り
 
 
 class OllamaBackend:
@@ -66,4 +67,5 @@ class OllamaBackend:
             backend=self.name,
             model=parsed.model or model,
             usage=Usage(input_tokens=parsed.prompt_eval_count, output_tokens=parsed.eval_count),
+            truncated=parsed.done_reason == "length",
         )

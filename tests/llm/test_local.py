@@ -95,3 +95,19 @@ async def test_想定外の形式の応答もLLMBackendErrorにする() -> None:
 
     with pytest.raises(LLMBackendError, match="解釈できません"):
         await backend.complete(LLMRequest(messages=[Message(role="user", content="x")]))
+
+
+@pytest.mark.parametrize(
+    ("done_reason", "truncated"), [("stop", False), ("length", True), (None, False)]
+)
+async def test_打ち切られた応答にはtruncatedを立てる(
+    done_reason: str | None, truncated: bool
+) -> None:
+    payload: dict[str, object] = {"message": {"role": "assistant", "content": "売上高は"}}
+    if done_reason is not None:
+        payload["done_reason"] = done_reason
+    backend = _backend(httpx.MockTransport(lambda _: httpx.Response(200, json=payload)))
+
+    res = await backend.complete(LLMRequest(messages=[Message(role="user", content="x")]))
+
+    assert res.truncated is truncated

@@ -9,14 +9,14 @@ _DEFAULT_MODELS: dict[Tier, str] = {"fast": "fake", "standard": "fake", "strong"
 class ScriptedBackend:
     """テスト用。あらかじめ渡した応答を順に返し、受け取ったリクエストを記録する。
 
-    文字列は応答として、例外は送出して返す。
+    文字列は応答の本文として、LLMResponse はそのまま返し、例外は送出する。
     """
 
     name = "scripted"
 
     def __init__(
         self,
-        script: Iterable[str | LLMBackendError],
+        script: Iterable[str | LLMResponse | LLMBackendError],
         models: dict[Tier, str] | None = None,
     ) -> None:
         self._script = deque(script)
@@ -33,4 +33,6 @@ class ScriptedBackend:
         item = self._script.popleft()
         if isinstance(item, LLMBackendError):
             raise item
+        if isinstance(item, LLMResponse):
+            return item
         return LLMResponse(text=item, backend=self.name, model=self.model_for(request.tier))

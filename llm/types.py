@@ -39,6 +39,8 @@ class LLMResponse(BaseModel):
     model: str
     usage: Usage = Field(default_factory=Usage)
     cached: bool = False
+    # max_tokens で途中で切れた応答。呼び出し側が検知して扱いを決める（キャッシュはしない）。
+    truncated: bool = False
 
 
 class LLMBackend(Protocol):

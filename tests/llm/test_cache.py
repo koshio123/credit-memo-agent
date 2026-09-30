@@ -4,7 +4,7 @@ import pytest
 
 from llm.cache import CachedBackend
 from llm.fake import ScriptedBackend
-from llm.types import LLMBackendError, LLMRequest, Message
+from llm.types import LLMBackendError, LLMRequest, LLMResponse, Message
 
 pytestmark = pytest.mark.anyio
 
@@ -74,3 +74,47 @@ async def test_壊れたキャッシュファイルは読み飛ばして上書�
     assert res.text == "再生成"
     assert res.cached is False
     assert "再生成" in cache_file.read_text(encoding="utf-8")
+
+
+async def test_キャッシュに書けなくても成功した応答は返す(tmp_path: Path) -> None:
+    not_a_dir = tmp_path / "file"
+    not_a_dir.write_text("ディレクトリではない", encoding="utf-8")
+    backend = CachedBackend(ScriptedBackend(["成功した応答"]), not_a_dir)
+
+    res = await backend.complete(_req())
+
+    assert res.text == "成功した応答"
+
+
+async def test_UTF8として壊れたキャッシュも読み飛ばす(tmp_path: Path) -> None:
+    backend = CachedBackend(ScriptedBackend(["最初"]), tmp_path)
+    await backend.complete(_req())
+    (cache_file,) = tmp_path.glob("*.json")
+    cache_file.write_bytes(b"\xff\xfe\x00\xff")
+
+    res = await CachedBackend(ScriptedBackend(["再生成"]), tmp_path).complete(_req())
+
+    assert res.text == "再生成"
+
+
+async def test_途中で切れた応答はキャッシュしない(tmp_path: Path) -> None:
+    cut = LLMResponse(text="売上高は前期比", backend="scripted", model="fake", truncated=True)
+    inner = ScriptedBackend([cut, "完全な応答"])
+    backend = CachedBackend(inner, tmp_path)
+
+    first = await backend.complete(_req())
+    second = await backend.complete(_req())
+
+    assert first.truncated is True
+    assert (second.text, second.cached) == ("完全な応答", False)
+    assert len(inner.requests) == 2
+
+
+async def test_空の応答はキャッシュしない(tmp_path: Path) -> None:
+    inner = ScriptedBackend(["  ", "中身のある応答"])
+    backend = CachedBackend(inner, tmp_path)
+
+    await backend.complete(_req())
+    second = await backend.complete(_req())
+
+    assert (second.text, second.cached) == ("中身のある応答", False)
