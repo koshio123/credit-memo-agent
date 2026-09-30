@@ -123,3 +123,63 @@ def test_埋め込みの数を数えられる(store: ChunkStore) -> None:
     store.add_embeddings("hash", ["A:0"], e.embed_documents([RISK]))
     assert store.count_embeddings("hash", "A") == 1
     assert isinstance(store.search_lexical("原材料", k=1)[0], Hit)
+
+
+# ---- 書き込みが確定されること（別の接続から見えるか） ----
+
+
+def _count_from_other_connection(store: ChunkStore, table: str) -> int:
+    """保存した接続とは別の接続で、件数を数える。確定（commit）されていなければ 0 になる。"""
+    import psycopg
+    from psycopg import sql
+
+    with psycopg.connect(store.url) as other:
+        other.execute(
+            sql.SQL("SET search_path TO {}, public").format(
+                sql.Identifier(store.schema or "public")
+            )
+        )
+        row = other.execute(
+            sql.SQL("SELECT count(*) FROM {}").format(sql.Identifier(table))
+        ).fetchone()
+    assert row is not None
+    return int(row[0])
+
+
+def test_保存した文書は_別の接続からも見える(store: ChunkStore) -> None:
+    # 以前は commit が抜けていて、接続を閉じると書き込みがすべて巻き戻された。
+    # 同じ接続では確定前のデータも見えるので、別の接続で確かめる
+    store.upsert_document(DOC_A, [_chunk("A", 0, RISK), _chunk("A", 1, STAFF)])
+
+    assert _count_from_other_connection(store, "documents") == 1
+    assert _count_from_other_connection(store, "chunks") == 2
+
+
+def test_保存した埋め込みも_別の接続から見える(store: ChunkStore) -> None:
+    e = HashEmbedder(dim=8)
+    store.upsert_document(DOC_A, [_chunk("A", 0, RISK)])
+    store.add_embeddings("hash", ["A:0"], e.embed_documents([RISK]))
+
+    assert _count_from_other_connection(store, "chunk_embeddings") == 1
+
+
+def test_検索だけの接続が_書き込みのトランザクションを開いたままにしない(store: ChunkStore) -> None:
+    store.upsert_document(DOC_A, [_chunk("A", 0, RISK)])
+    store.search_lexical("原材料", k=1)
+    store.get_chunks("A")
+
+    # 読み取りの後も、未確定のトランザクションが残っていない
+    assert store.in_transaction() is False
+
+
+def test_読み取りの後の書き込みも_別の接続から見える(store: ChunkStore) -> None:
+    # 取り込みは「読んでから書く」。読み取りで暗黙のトランザクションが開いたままだと、
+    # 続く書き込みの transaction() が入れ子（セーブポイント）になり、確定されない
+    assert store.chunks_unchanged("A", []) is True  # 先に読む
+    store.upsert_document(DOC_A, [_chunk("A", 0, RISK)])
+    e = HashEmbedder(dim=8)
+    store.add_embeddings("hash", ["A:0"], e.embed_documents([RISK]))
+
+    assert _count_from_other_connection(store, "documents") == 1
+    assert _count_from_other_connection(store, "chunks") == 1
+    assert _count_from_other_connection(store, "chunk_embeddings") == 1

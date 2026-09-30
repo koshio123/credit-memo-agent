@@ -51,21 +51,35 @@ def _chunk_from_row(row: Sequence[object]) -> Chunk:
 
 
 class ChunkStore:
-    def __init__(self, conn: psycopg.Connection[tuple[object, ...]]) -> None:
+    def __init__(
+        self,
+        conn: psycopg.Connection[tuple[object, ...]],
+        url: str = "",
+        schema: str | None = None,
+    ) -> None:
         self._conn = conn
+        self.url = url
+        self.schema = schema
+
+    def in_transaction(self) -> bool:
+        """未確定のトランザクションが開いたままか。"""
+        return self._conn.info.transaction_status != psycopg.pq.TransactionStatus.IDLE
 
     @classmethod
     def connect(cls, url: str, schema: str | None = None) -> ChunkStore:
         """接続する。schema を指定すると、その中に表を作る（テストの分離用）。"""
-        conn = psycopg.connect(url, row_factory=tuple_row)
+        # autocommit にする。そうしないと、読み取りで暗黙のトランザクションが開いたままになり、
+        # 続く書き込みの transaction() が入れ子（セーブポイント）になって確定されず、接続を閉じると
+        # 書き込みがすべて巻き戻される（取り込みで実際に起きた）。autocommit なら、読み取りは
+        # そのつど確定し、書き込みは transaction() の範囲で確実に確定する。
+        conn = psycopg.connect(url, row_factory=tuple_row, autocommit=True)
         # vector 型を登録する前に、拡張がなければならない
         conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
         conn.execute("CREATE EXTENSION IF NOT EXISTS pg_bigm")
-        conn.commit()
         if schema is not None:
             conn.execute(sql.SQL("SET search_path TO {}, public").format(sql.Identifier(schema)))
         register_vector(conn)
-        store = cls(conn)
+        store = cls(conn, url=url, schema=schema)
         store.init_schema()
         return store
 
@@ -74,7 +88,6 @@ class ChunkStore:
 
     def init_schema(self) -> None:
         self._conn.execute(_SCHEMA_SQL)  # type: ignore[arg-type]
-        self._conn.commit()
 
     # ---- 保存 ----
 
@@ -118,6 +131,24 @@ class ChunkStore:
         )
         rows = self._conn.execute(query, (doc_id,)).fetchall()
         return [_chunk_from_row(r) for r in rows]
+
+    def all_chunks(self) -> list[Chunk]:
+        """全文書のチャンクを、文書・並び順に返す（BM25 の索引を作るのに使う）。"""
+        query = sql.SQL("SELECT {cols} FROM chunks c ORDER BY c.doc_id, c.seq").format(
+            cols=_CHUNK_COLUMNS
+        )
+        return [_chunk_from_row(r) for r in self._conn.execute(query).fetchall()]
+
+    def corpus_fingerprint(self) -> tuple[int, int]:
+        """チャンク全体の目印（件数と本文のハッシュの和）。取り込みで変わったかを安く調べる。"""
+        row = self._conn.execute(
+            "SELECT count(*), coalesce(sum(hashtext(chunk_id || text)::bigint), 0) FROM chunks"
+        ).fetchone()
+        return (int(row[0]), int(row[1])) if row else (0, 0)  # type: ignore[call-overload]
+
+    def chunks_unchanged(self, doc_id: str, chunks: Sequence[Chunk]) -> bool:
+        """保存済みのチャンクが、渡されたものと完全に同じか（ID・見出し・ページ・本文）。"""
+        return self.get_chunks(doc_id) == list(chunks)
 
     def count_embeddings(self, model: str, doc_id: str) -> int:
         row = self._conn.execute(

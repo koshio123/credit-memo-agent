@@ -1,0 +1,127 @@
+"""検索（全文・ベクトル・融合）の統合テスト。実際の DB を使う。"""
+
+import pytest
+
+from retrieval.chunker import Chunk
+from retrieval.embedding import HashEmbedder
+from retrieval.search import Retriever
+from retrieval.store import ChunkStore, DocumentRecord, Hit
+
+pytestmark = pytest.mark.db
+
+RISK = "原材料価格が高騰した場合、収益を圧迫する可能性があります。"
+STAFF = "従業員の平均年齢は四十歳で、平均勤続年数は十五年です。"
+DIV = "配当性向は三十パーセントを目安として、安定的な配当を継続します。"
+DOC = DocumentRecord("D1", "9999", "サンプル", "2026-03-31", 3)
+
+
+@pytest.fixture
+def loaded(store: ChunkStore) -> tuple[ChunkStore, HashEmbedder]:
+    e = HashEmbedder(dim=64)
+    chunks = [
+        Chunk(f"D1:{i}", "D1", ["第2 【事業の状況】"], i + 1, i + 1, text)
+        for i, text in enumerate([STAFF, RISK, DIV])
+    ]
+    store.upsert_document(DOC, chunks)
+    store.add_embeddings(
+        "hash", [c.chunk_id for c in chunks], e.embed_documents([c.text for c in chunks])
+    )
+    return store, e
+
+
+def ids(hits: list[Hit]) -> list[str]:
+    return [h.chunk.chunk_id for h in hits]
+
+
+def test_全文検索だけ(loaded: tuple[ChunkStore, HashEmbedder]) -> None:
+    store, e = loaded
+    r = Retriever(store, e)
+    assert ids(r.search("原材料価格の高騰が収益に与える影響", k=3, mode="lexical"))[0] == "D1:1"
+
+
+def test_ベクトル検索だけ(loaded: tuple[ChunkStore, HashEmbedder]) -> None:
+    store, e = loaded
+    r = Retriever(store, e)
+    assert ids(r.search("原材料価格の高騰が収益に与える影響", k=3, mode="vector"))[0] == "D1:1"
+
+
+def test_融合は_全文とベクトルの両方で上位のものを上に出す(
+    loaded: tuple[ChunkStore, HashEmbedder],
+) -> None:
+    store, e = loaded
+    r = Retriever(store, e)
+    hits = r.search("原材料価格の高騰が収益に与える影響", k=3, mode="hybrid")
+    assert ids(hits)[0] == "D1:1"
+    assert [h.rank for h in hits] == list(range(1, len(hits) + 1))
+
+
+def test_kで件数を絞る(loaded: tuple[ChunkStore, HashEmbedder]) -> None:
+    store, e = loaded
+    assert len(Retriever(store, e).search("従業員", k=1, mode="hybrid")) == 1
+
+
+def test_文書で絞り込める(loaded: tuple[ChunkStore, HashEmbedder]) -> None:
+    store, e = loaded
+    r = Retriever(store, e)
+    assert r.search("原材料", k=3, mode="hybrid", doc_ids=["NONE"]) == []
+
+
+def test_クエリは全角半角をそろえてから検索する(loaded: tuple[ChunkStore, HashEmbedder]) -> None:
+    # 本文は NFKC で正規化されている。全角の数字・英字を含むクエリでも同じ結果になる
+    store, e = loaded
+    r = Retriever(store, e)
+    assert ids(r.search("配当性向は３０％", k=3, mode="lexical")) == ids(
+        r.search("配当性向は30%", k=3, mode="lexical")
+    )
+
+
+def test_BM25検索だけ(loaded: tuple[ChunkStore, HashEmbedder]) -> None:
+    store, e = loaded
+    hits = Retriever(store, e).search("原材料価格の高騰が収益に与える影響", k=3, mode="bm25")
+    assert ids(hits)[0] == "D1:1"
+    assert [h.rank for h in hits] == list(range(1, len(hits) + 1))
+    assert hits[0].chunk.text == RISK
+
+
+def test_BM25検索は_文書で絞り込める(loaded: tuple[ChunkStore, HashEmbedder]) -> None:
+    store, e = loaded
+    r = Retriever(store, e)
+    assert r.search("原材料価格", k=3, mode="bm25", doc_ids=["NONE"]) == []
+    assert ids(r.search("原材料価格", k=3, mode="bm25", doc_ids=["D1"]))[0] == "D1:1"
+
+
+def test_BM25の統計は_絞り込みに関係なく全文書のもの(store: ChunkStore) -> None:
+    # 別の文書に大量にある2文字は、絞り込んだ先でも軽く見る（IDF は索引全体で計算）
+    e = HashEmbedder(dim=64)
+    a = Chunk("A:0", "A", ["h"], 1, 1, "圧迫する")
+    b = Chunk("B:0", "B", ["h"], 1, 1, "検討する")
+    store.upsert_document(DocumentRecord("A", "1", "甲", "2026-03-31", 1), [a])
+    store.upsert_document(DocumentRecord("B", "2", "乙", "2026-03-31", 1), [b])
+    r = Retriever(store, e)
+    only_a = r.search("圧迫する", k=3, mode="bm25", doc_ids=["A"])
+    both = r.search("圧迫する", k=3, mode="bm25")
+    assert only_a[0].score == both[0].score
+
+
+def test_BM25と融合しても_上位は変わらない(loaded: tuple[ChunkStore, HashEmbedder]) -> None:
+    store, e = loaded
+    hits = Retriever(store, e).search("原材料価格の高騰が収益に与える影響", k=3, mode="hybrid_bm25")
+    assert ids(hits)[0] == "D1:1"
+    assert [h.rank for h in hits] == list(range(1, len(hits) + 1))
+
+
+def test_索引を作った後に取り込んだ文書も_検索できる(store: ChunkStore) -> None:
+    e = HashEmbedder(dim=64)
+    r = Retriever(store, e)
+    assert r.search("原材料価格", k=3, mode="bm25") == []
+    store.upsert_document(
+        DocumentRecord("D1", "9999", "サンプル", "2026-03-31", 1),
+        [Chunk("D1:0", "D1", ["h"], 1, 1, RISK)],
+    )
+    assert ids(r.search("原材料価格", k=3, mode="bm25")) == ["D1:0"]
+
+
+def test_知らないモードはエラー(loaded: tuple[ChunkStore, HashEmbedder]) -> None:
+    store, e = loaded
+    with pytest.raises(ValueError):
+        Retriever(store, e).search("x", k=1, mode="magic")  # type: ignore[arg-type]
