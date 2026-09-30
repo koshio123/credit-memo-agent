@@ -3,6 +3,8 @@ name = "credit-memo-agent"
 version = "0.1.0"
 description = "EDINETの有価証券報告書から、出典付きの与信メモ草案を生成するマルチエージェント"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.14"
 dependencies = [
     "claude-agent-sdk>=0.2.162",
