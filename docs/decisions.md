@@ -2,6 +2,14 @@
 
 何を選び、何を諦めたかを、その時点で書き溜める。新しいものを上に追記する。
 
+## 2026-09-30 LLMバックエンドの抽象（`llm/`）
+
+- **決定**: 呼び出しは `LLMBackend`（Protocol）に統一し、`complete(LLMRequest) -> LLMResponse` を非同期で提供する。モデルは呼び出し側が `fast / standard / strong` の3段階で指定し、実モデル名はバックエンドが決める。応答キャッシュは `CachedBackend` としてバックエンドを包む。
+- **理由**: Claude Pro の利用枠に制約があるため、ローカルLLMとClaudeを差し替えられることが前提になる。段階で指定すれば、エージェントのコードを変えずに割当だけ変えられる。キャッシュのキーにバックエンド名とモデル名を含めるので、割当を変えたときに古い応答を使い回さない。
+- **仕様**: 失敗した呼び出しはキャッシュしない。壊れたキャッシュは読み飛ばして上書きする。温度が0より大きい呼び出しも、最初に得た応答を再現する（再現性を優先）。バックエンド固有の失敗は `LLMBackendError` にそろえる。
+- **未実装**: `claude_code`（Agent SDK）と `anthropic_api`。前者はProのログインで動くか、規約上問題ないかを確認してから実装する。選ぶと `NotImplementedError` になる。
+- **未検証**: Ollama の実機との接続。Ollama は未導入で、現状のテストはHTTPをモックしている。Qwen3 は既定で思考過程（`<think>`）を出す可能性があるので、実機で確認して必要なら除去する。
+
 ## 2026-09-30 PostgreSQL（pgvector + pg_bigm）
 
 - **決定**: `pgvector/pgvector:pg17` にpg_bigm（v1.2-20250903）をソースからビルドして足したイメージを、Docker Composeで動かす。日本語の全文検索は pg_bigm の2-gram（`gin_bigm_ops`）、ベクトル検索は pgvector。
