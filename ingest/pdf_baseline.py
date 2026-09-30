@@ -14,12 +14,15 @@
 import re
 import statistics
 import unicodedata
+import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Literal
 
 import pdfplumber
+from pydantic import BaseModel, ValidationError
 
 Section = Literal["BS", "PL", "CF"]
 
@@ -199,6 +202,15 @@ _ITEMS: dict[str, tuple[Section, list[str]]] = {
 }
 
 
+# 符号を印字のとおりに読む項目のうち、「損失」だけのラベルは損失額を正の数で印字する
+_SIGNED_BY_LABEL = {"operating_income", "net_income_attributable_to_owners"}
+
+
+def _is_pure_loss_label(label: str) -> bool:
+    """「営業損失」のように、利益を含まない損失のラベルか。「営業損失(△)」は印字どおりに読む。"""
+    return "損失" in label and "利益" not in label and "△" not in label
+
+
 def _page_unit(page: str, carried: int | None) -> int | None:
     return unit_of(page) or carried
 
@@ -223,6 +235,11 @@ def extract_items(pages: list[str]) -> dict[str, ExtractedValue]:
             result[name] = ExtractedValue(None, reason="unit_not_found")
             continue
 
+        # 前期の列を持つ表（「前連結会計年度」の見出しがある）では、数値が1つの行は列の対応が
+        # 分からないので読まない。1列だけの表（初回の有報など）では読む。継続ページには見出しが
+        # 無いので、ページではなく節全体で判定する
+        two_columns = any("前連結会計年度" in pages[i] for i in page_indexes)
+
         found: ExtractedValue | None = None
         for pattern in patterns:
             regex = re.compile(pattern)
@@ -231,9 +248,17 @@ def extract_items(pages: list[str]) -> dict[str, ExtractedValue]:
                 if unit is None:
                     continue
                 for row in _rows(pages[i]):
-                    if len(row.values) >= 2 and any(regex.search(label) for label in row.labels):
-                        found = ExtractedValue(row.values[-1] * unit, section, i + 1, row.raw)
-                        break
+                    if two_columns and len(row.values) < 2:
+                        continue
+                    label = next((lb for lb in row.labels if regex.search(lb)), None)
+                    if label is None:
+                        continue
+                    value = row.values[-1] * unit
+                    if name in _SIGNED_BY_LABEL and _is_pure_loss_label(label):
+                        # 損失のラベルの値は常に負（正の数で印字されていれば反転、△付きはそのまま）
+                        value = -abs(value)
+                    found = ExtractedValue(value, section, i + 1, row.raw)
+                    break
                 if found:
                     break
             if found:
@@ -256,3 +281,46 @@ def read_pages(path: Path) -> list[str]:
             body = page.filter(lambda o, c=cutoff: o.get("object_type") != "char" or o["size"] >= c)
             texts.append(unicodedata.normalize("NFKC", body.extract_text() or ""))
     return texts
+
+
+# 本文の取り出し方（read_pages）を変えたら上げる。古いキャッシュを使い続けないための版番号
+TEXT_EXTRACTION_VERSION = 1
+
+
+class _TextCache(BaseModel):
+    version: int
+    pages: list[str]
+
+
+def _load_cache(cache: Path) -> list[str] | None:
+    try:
+        data = _TextCache.model_validate_json(cache.read_text(encoding="utf-8"))
+    except OSError, ValidationError:
+        return None
+    if data.version != TEXT_EXTRACTION_VERSION or not data.pages:
+        return None
+    return data.pages
+
+
+def cached_pages(
+    pdf_path: Path,
+    cache_dir: Path,
+    reader: Callable[[Path], list[str]] = read_pages,
+) -> list[str]:
+    """本文を、版番号つきでキャッシュして返す。版が違う・壊れている・空のキャッシュは使わない。"""
+    cache = cache_dir / f"{pdf_path.stem}.json"
+    if (pages := _load_cache(cache)) is not None:
+        return pages
+    pages = reader(pdf_path)
+    if pages:  # ページが0件の結果（読み取りの失敗）は保存しない
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        tmp = cache.with_name(f"{cache.name}.{uuid.uuid4().hex}.tmp")
+        try:
+            tmp.write_text(
+                _TextCache(version=TEXT_EXTRACTION_VERSION, pages=pages).model_dump_json(),
+                encoding="utf-8",
+            )
+            tmp.replace(cache)
+        finally:
+            tmp.unlink(missing_ok=True)
+    return pages

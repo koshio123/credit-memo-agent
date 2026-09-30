@@ -4,11 +4,13 @@
 """
 
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
 from ingest.pdf_baseline import (
     ExtractedValue,
+    cached_pages,
     extract_items,
     find_sections,
     parse_line,
@@ -302,3 +304,110 @@ def test_受取利息が合算の行しかない会社は_合算を受取利息�
 def test_受取利息の行があれば_合算の行より優先する() -> None:
     page = _pl_with("受取利息 32 68", "受取利息及び配当金 156 175")
     assert extract_items([BS_PAGE, page, CF_PAGE])["interest_income"].value == D(68) * 1_000_000
+
+
+# ---- コードレビューでの指摘への対応 ----
+
+
+def test_損失のラベルは正の数で印字される_符号を負にする() -> None:
+    # 「営業損失」は損失額を正の数で印字する。XBRL では営業利益が負の値
+    page = _pl_with("営業損失 3,536 647").replace("営業利益 10 20\n", "")
+    item = extract_items([BS_PAGE, page, CF_PAGE])["operating_income"]
+    assert item.value == D(-647) * 1_000_000
+
+
+def test_利益又は損失_のラベルは印字された符号のまま読む() -> None:
+    # 「営業利益又は営業損失(△)」は、損失なら △ 付きで印字される
+    page = _pl_with("営業利益又は営業損失(△) 3,536 △647").replace("営業利益 10 20\n", "")
+    assert extract_items([BS_PAGE, page, CF_PAGE])["operating_income"].value == D(-647) * 1_000_000
+
+
+def test_親会社株主に帰属する当期純損失も_正の数で印字されたら負にする() -> None:
+    page = _pl_with("親会社株主に帰属する当期純損失 2,436 1,843")
+    item = extract_items([BS_PAGE, page, CF_PAGE])["net_income_attributable_to_owners"]
+    assert item.value == D(-1_843) * 1_000_000
+
+
+SINGLE_COLUMN_PL = """EDINET提出書類
+サンプル株式会社(E00000)
+有価証券報告書
+2【連結損益計算書及び連結包括利益計算書】
+(1)【連結損益計算書】
+(単位:百万円)
+当連結会計年度
+売上高 139,657
+営業利益 18,349
+"""
+
+SINGLE_COLUMN_BS = """EDINET提出書類
+サンプル株式会社(E00000)
+有価証券報告書
+1【連結貸借対照表】
+(単位:百万円)
+当連結会計年度
+資産の部
+資産合計 181,811
+"""
+
+
+def test_初回の有報など_1列だけの財務諸表も読む() -> None:
+    items = extract_items([SINGLE_COLUMN_BS, SINGLE_COLUMN_PL, CF_PAGE])
+    assert items["net_sales"].value == D(139_657) * 1_000_000
+    assert items["total_assets"].value == D(181_811) * 1_000_000
+
+
+def test_2列の財務諸表で片方しか数値が無い行は_読まない() -> None:
+    # 前期の列を持つ表で、数値が1つの行は、列の対応が分からないので読まない
+    page = _pl_with("受取利息 68")
+    assert extract_items([BS_PAGE, page, CF_PAGE])["interest_income"].value is None
+
+
+# ---- 本文のキャッシュ ----
+
+
+def _pdf(tmp_path: Path) -> Path:
+    pdf = tmp_path / "x.pdf"
+    pdf.write_bytes(b"%PDF")
+    return pdf
+
+
+def test_本文のキャッシュを使い_2回目は読まない(tmp_path: Path) -> None:
+    calls: list[Path] = []
+
+    def reader(path: Path) -> list[str]:
+        calls.append(path)
+        return ["p1", "p2"]
+
+    pdf = _pdf(tmp_path)
+    assert cached_pages(pdf, tmp_path / "cache", reader=reader) == ["p1", "p2"]
+    assert cached_pages(pdf, tmp_path / "cache", reader=reader) == ["p1", "p2"]
+    assert len(calls) == 1
+
+
+def test_抽出方法の版が変わったら_古いキャッシュを使わない(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import ingest.pdf_baseline as mod
+
+    pdf = _pdf(tmp_path)
+    cached_pages(pdf, tmp_path / "cache", reader=lambda _: ["古い本文"])
+
+    monkeypatch.setattr(mod, "TEXT_EXTRACTION_VERSION", mod.TEXT_EXTRACTION_VERSION + 1)
+    assert cached_pages(pdf, tmp_path / "cache", reader=lambda _: ["新しい本文"]) == ["新しい本文"]
+
+
+@pytest.mark.parametrize(
+    "content", ["", "これはJSONではない", "[]", "{}", '{"version": 999, "pages": ["x"]}']
+)
+def test_壊れた_空の_版の違うキャッシュは使わない(tmp_path: Path, content: str) -> None:
+    pdf = _pdf(tmp_path)
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    (cache / "x.json").write_text(content, encoding="utf-8")
+
+    assert cached_pages(pdf, cache, reader=lambda _: ["読み直した"]) == ["読み直した"]
+
+
+def test_ページが0件の抽出結果はキャッシュしない(tmp_path: Path) -> None:
+    cached_pages(_pdf(tmp_path), tmp_path / "cache", reader=lambda _: [])
+    assert not list((tmp_path / "cache").glob("*.json"))

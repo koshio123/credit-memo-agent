@@ -15,7 +15,7 @@ from pathlib import Path
 from evals.companies import DATASETS, load_dataset
 from evals.ground_truth import build_company_ground_truth
 from evals.l1 import CompanyScore, render_report, score_company, summarize
-from ingest.pdf_baseline import ExtractedValue, extract_items, read_pages
+from ingest.pdf_baseline import ExtractedValue, cached_pages, extract_items
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("eval_l1")
@@ -30,14 +30,9 @@ LABELS = {
 
 
 def pages_for(doc_id: str) -> list[str]:
-    cache = TEXT_CACHE / f"{doc_id}.json"
-    if cache.exists():
-        return json.loads(cache.read_text(encoding="utf-8"))
     started = time.time()
-    pages = read_pages(EDINET_DIR / doc_id / f"{doc_id}.pdf")
-    cache.parent.mkdir(parents=True, exist_ok=True)
-    cache.write_text(json.dumps(pages, ensure_ascii=False), encoding="utf-8")
-    log.info("  %s: %d ページを読みました（%.0f 秒）", doc_id, len(pages), time.time() - started)
+    pages = cached_pages(EDINET_DIR / doc_id / f"{doc_id}.pdf", TEXT_CACHE)
+    log.info("  %s: %d ページ（%.0f 秒）", doc_id, len(pages), time.time() - started)
     return pages
 
 
