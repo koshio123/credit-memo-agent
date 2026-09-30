@@ -1,0 +1,1417 @@
+{
+  "note": "設問は Claude（この開発セッション）が、各社の有価証券報告書の本文を読んで作った。根拠（ページと本文の一節）は、指定した行から機械的に取り出した。人による確認は、まだ行っていない。",
+  "questions": [
+    {
+      "id": "dev-001",
+      "split": "dev",
+      "sec_code": "6744",
+      "doc_id": "S100YHTN",
+      "category": "事業",
+      "question": "気象防災設備や宇宙・防衛関連の設備機器を製造している子会社はどこか。",
+      "gold": [
+        {
+          "page": 7,
+          "evidence": "明星電気株式会社 気象防災設備機器・宇宙防衛設備機器の製造・販売"
+        }
+      ]
+    },
+    {
+      "id": "dev-002",
+      "split": "dev",
+      "sec_code": "6744",
+      "doc_id": "S100YHTN",
+      "category": "方針",
+      "question": "中長期のビジョンはどのような名称で、何年度のありたい姿を目指しているか。",
+      "gold": [
+        {
+          "page": 10,
+          "evidence": "このような状況のなか、当社グループは2028年度のありたい姿と、その実現に向けた"
+        }
+      ]
+    },
+    {
+      "id": "dev-003",
+      "split": "dev",
+      "sec_code": "6744",
+      "doc_id": "S100YHTN",
+      "category": "配当",
+      "question": "連結ベースの配当性向について、目標値はいくつか。",
+      "gold": [
+        {
+          "page": 36,
+          "evidence": "この方針のもと、「中長期ビジョン2028 〜期待の先をカタチに〜」の促進を図ると"
+        }
+      ]
+    },
+    {
+      "id": "dev-004",
+      "split": "dev",
+      "sec_code": "6744",
+      "doc_id": "S100YHTN",
+      "category": "研究開発",
+      "question": "研究開発に携わる人員の規模と、従業員全体に占める比率は。",
+      "gold": [
+        {
+          "page": 29,
+          "evidence": "す。研究開発スタッフはグループ全体で148名であり、これは総従業員の約5%にあた"
+        }
+      ]
+    },
+    {
+      "id": "dev-005",
+      "split": "dev",
+      "sec_code": "6744",
+      "doc_id": "S100YHTN",
+      "category": "人材",
+      "question": "必要な人材が確保・育成できなかった場合、事業にどのような影響が及ぶと考えているか。",
+      "gold": [
+        {
+          "page": 59,
+          "evidence": "び育成が重要であると認識しております。これらの人財が十分に確保・育成されない場合"
+        }
+      ]
+    },
+    {
+      "id": "dev-006",
+      "split": "dev",
+      "sec_code": "1969",
+      "doc_id": "S100YDOU",
+      "category": "事業",
+      "question": "このグループの主力となっている事業分野は何か。",
+      "gold": [
+        {
+          "page": 6,
+          "evidence": "用関連会社4社で構成され、設備工事事業、設備機器の製造・販売事業を主な事業内容と"
+        }
+      ]
+    },
+    {
+      "id": "dev-007",
+      "split": "dev",
+      "sec_code": "1969",
+      "doc_id": "S100YDOU",
+      "category": "リスク",
+      "question": "顧客が設備投資を延期・中止した場合、事業にどんな影響が生じうるか。",
+      "gold": [
+        {
+          "page": 25,
+          "evidence": "想定を上回る建設需要および空調設備需要が減退する等、事業環境に著しい変動が生じる"
+        }
+      ]
+    },
+    {
+      "id": "dev-008",
+      "split": "dev",
+      "sec_code": "1969",
+      "doc_id": "S100YDOU",
+      "category": "リスク",
+      "question": "工事に使う資材の値上がりに対して、調達面でどのような対策をとる考えか。",
+      "gold": [
+        {
+          "page": 25,
+          "evidence": "ありますが、これに対しては、購買の体制を強化し、全店集中購買を加速させることでス"
+        }
+      ]
+    },
+    {
+      "id": "dev-009",
+      "split": "dev",
+      "sec_code": "1969",
+      "doc_id": "S100YDOU",
+      "category": "リスク",
+      "question": "現場の人手が足りなくなる問題に、どう対応するつもりか。",
+      "gold": [
+        {
+          "page": 26,
+          "evidence": "当社グループは、アウトソーシング体制の構築と活用、ITツールの活用、業務の標準化"
+        }
+      ]
+    },
+    {
+      "id": "dev-010",
+      "split": "dev",
+      "sec_code": "1969",
+      "doc_id": "S100YDOU",
+      "category": "配当",
+      "question": "利益還元の基本的な考え方と、配当性向の目安を教えてほしい。",
+      "gold": [
+        {
+          "page": 49,
+          "evidence": "当社の株主還元の方針は、配当を基本とし、配当性向40%を目途に持続的な利益成長に"
+        }
+      ]
+    },
+    {
+      "id": "dev-011",
+      "split": "dev",
+      "sec_code": "8892",
+      "doc_id": "S100YGKW",
+      "category": "事業",
+      "question": "分譲マンション事業で展開しているブランドの種類は。",
+      "gold": [
+        {
+          "page": 6,
+          "evidence": "分譲マンション事業において、基幹ブランドである「レ・ジェイド」、希少価値を追求し"
+        }
+      ]
+    },
+    {
+      "id": "dev-012",
+      "split": "dev",
+      "sec_code": "8892",
+      "doc_id": "S100YGKW",
+      "category": "リスク",
+      "question": "物件の販売が計画どおり進まなくなる恐れのある要因は何か。",
+      "gold": [
+        {
+          "page": 23,
+          "evidence": "計画を策定しておりますが、景気動向、経済情勢、金利、税制、地価の動向等による需給"
+        }
+      ]
+    },
+    {
+      "id": "dev-013",
+      "split": "dev",
+      "sec_code": "8892",
+      "doc_id": "S100YGKW",
+      "category": "リスク",
+      "question": "土地の仕入れ資金は主にどのように調達しているのか。",
+      "gold": [
+        {
+          "page": 26,
+          "evidence": "融機関からの借入金によって調達しており、用地取得から事業化又は売却までに時間を要"
+        }
+      ]
+    },
+    {
+      "id": "dev-014",
+      "split": "dev",
+      "sec_code": "8892",
+      "doc_id": "S100YGKW",
+      "category": "リスク",
+      "question": "不動産業を営むために取得している免許や登録は何に基づくものか。",
+      "gold": [
+        {
+          "page": 23,
+          "evidence": "また、当社グループは、不動産業者として、「宅地建物取引業法」、「マンションの管理"
+        }
+      ]
+    },
+    {
+      "id": "dev-015",
+      "split": "dev",
+      "sec_code": "8892",
+      "doc_id": "S100YGKW",
+      "category": "配当",
+      "question": "減配をしない方針として導入している配当の仕組みは何か。",
+      "gold": [
+        {
+          "page": 51,
+          "evidence": "り「累進的配当政策」(前年度の1株当たり配当額を下限とし、減配を行わず、配当維持"
+        }
+      ]
+    },
+    {
+      "id": "dev-016",
+      "split": "dev",
+      "sec_code": "9024",
+      "doc_id": "S100YEFI",
+      "category": "事業",
+      "question": "持株会社である当社が担う機能にはどのようなものがあるか。",
+      "gold": [
+        {
+          "page": 6,
+          "evidence": "当社は純粋持株会社として、「戦略機能」「効率化・適正化機能」「広報・IR機能」「"
+        }
+      ]
+    },
+    {
+      "id": "dev-017",
+      "split": "dev",
+      "sec_code": "9024",
+      "doc_id": "S100YEFI",
+      "category": "リスク",
+      "question": "特に重要なリスクとして最初に挙げられている領域は何か。",
+      "gold": [
+        {
+          "page": 33,
+          "evidence": "当社グループの長期戦略においては、都市交通・沿線事業やホテル・レジャー事業は、不"
+        }
+      ]
+    },
+    {
+      "id": "dev-018",
+      "split": "dev",
+      "sec_code": "9024",
+      "doc_id": "S100YEFI",
+      "category": "リスク",
+      "question": "グループ全体のリスク管理を統括している部署はどこか。",
+      "gold": [
+        {
+          "page": 30,
+          "evidence": "への影響を低減していくため、当社の経営戦略部を当社及び西武グループ全体のリスクマ"
+        }
+      ]
+    },
+    {
+      "id": "dev-019",
+      "split": "dev",
+      "sec_code": "9024",
+      "doc_id": "S100YEFI",
+      "category": "配当",
+      "question": "配当の下限の目安として用いている指標は何か。",
+      "gold": [
+        {
+          "page": 81,
+          "evidence": "ことを掲げております。その中で、DOE2.0%を下限とする累進配当を導入すること"
+        }
+      ]
+    },
+    {
+      "id": "dev-020",
+      "split": "dev",
+      "sec_code": "9024",
+      "doc_id": "S100YEFI",
+      "category": "方針",
+      "question": "成長戦略の中核に据えている事業は何か。",
+      "gold": [
+        {
+          "page": 13,
+          "evidence": "社会的価値と企業価値を極大化していくため、不動産事業を核とした成長戦略からなる「"
+        }
+      ]
+    },
+    {
+      "id": "dev-021",
+      "split": "dev",
+      "sec_code": "7128",
+      "doc_id": "S100XU07",
+      "category": "事業",
+      "question": "主に何を販売している企業グループか。",
+      "gold": [
+        {
+          "page": 7,
+          "evidence": "非適用の関連会社1社で構成されており、主として、機械工具類、鉄骨建築関連資材及び"
+        }
+      ]
+    },
+    {
+      "id": "dev-022",
+      "split": "dev",
+      "sec_code": "7128",
+      "doc_id": "S100XU07",
+      "category": "リスク",
+      "question": "リスク管理の中心となる委員会は、どこに設置されているか。",
+      "gold": [
+        {
+          "page": 24,
+          "evidence": "当社では、社内規程に基づき、代表取締役社長の下に「リスク管理委員会」を設置してお"
+        }
+      ]
+    },
+    {
+      "id": "dev-023",
+      "split": "dev",
+      "sec_code": "7128",
+      "doc_id": "S100XU07",
+      "category": "配当",
+      "question": "配当方針は、何を基準とする方式に改められたか。",
+      "gold": [
+        {
+          "page": 46,
+          "evidence": "強化策として、配当方針をDOE(株主資本配当率)に基づいた継続的な増配を基本とす"
+        }
+      ]
+    },
+    {
+      "id": "dev-024",
+      "split": "dev",
+      "sec_code": "7128",
+      "doc_id": "S100XU07",
+      "category": "配当",
+      "question": "株主還元の数値目標の達成時期は、いつに前倒しされたか。",
+      "gold": [
+        {
+          "page": 46,
+          "evidence": "方針及び当期・次期の配当」において、DOE3.5%以上としていた株主還元目標の達"
+        }
+      ]
+    },
+    {
+      "id": "dev-025",
+      "split": "dev",
+      "sec_code": "7128",
+      "doc_id": "S100XU07",
+      "category": "方針",
+      "question": "目指している企業像はどのようなものか。",
+      "gold": [
+        {
+          "page": 13,
+          "evidence": "これらを実現するため、当社グループでは他にはない独自の解決策を生み出す“ユニーク"
+        }
+      ]
+    },
+    {
+      "id": "dev-026",
+      "split": "dev",
+      "sec_code": "9742",
+      "doc_id": "S100YF4O",
+      "category": "リスク",
+      "question": "顧客の情報化投資の動向が変わると、どんな影響が出うるか。会社はどう対応しているか。",
+      "gold": [
+        {
+          "page": 14,
+          "evidence": "す。この事業環境の変化に対応するため、当社グループでは、顧客・業界における情報化"
+        }
+      ]
+    },
+    {
+      "id": "dev-027",
+      "split": "dev",
+      "sec_code": "9742",
+      "doc_id": "S100YF4O",
+      "category": "リスク",
+      "question": "ソフトウェア開発で品質不良や納期遅延が起きた場合に、どのような損害が生じうるか。",
+      "gold": [
+        {
+          "page": 14,
+          "evidence": "客との取引契約に関して債務不履行が発生した場合、顧客から契約上の損害賠償請求また"
+        }
+      ]
+    },
+    {
+      "id": "dev-028",
+      "split": "dev",
+      "sec_code": "9742",
+      "doc_id": "S100YF4O",
+      "category": "リスク",
+      "question": "システム運用で障害が起きたとき、想定される責任は何か。",
+      "gold": [
+        {
+          "page": 14,
+          "evidence": "撃、運用ミスなどにより、システムダウンや回線障害が発生し、顧客の事業が停止もしく"
+        }
+      ]
+    },
+    {
+      "id": "dev-029",
+      "split": "dev",
+      "sec_code": "9742",
+      "doc_id": "S100YF4O",
+      "category": "方針",
+      "question": "IT人材の不足が進む中で、ビジネスモデルをどう変える必要があると認識しているか。",
+      "gold": [
+        {
+          "page": 7,
+          "evidence": "は、生成AI等の各種技術の活用による高付加価値なサービス・ラインナップの充実と従"
+        }
+      ]
+    },
+    {
+      "id": "dev-030",
+      "split": "dev",
+      "sec_code": "9742",
+      "doc_id": "S100YF4O",
+      "category": "配当",
+      "question": "剰余金の配当は、年に何回行うことを基本としているか。",
+      "gold": [
+        {
+          "page": 29,
+          "evidence": "当社は、中間配当と期末配当の年2回の剰余金の配当を行うことを基本としております。"
+        }
+      ]
+    },
+    {
+      "id": "dev-031",
+      "split": "dev",
+      "sec_code": "4228",
+      "doc_id": "S100YI2M",
+      "category": "方針",
+      "question": "創立100周年に向けて掲げている長期のビジョンの名称は。",
+      "gold": [
+        {
+          "page": 9,
+          "evidence": "当社は2023年1月、創立100周年(2059年)に目指す姿「積水化成品グループ"
+        }
+      ]
+    },
+    {
+      "id": "dev-032",
+      "split": "dev",
+      "sec_code": "4228",
+      "doc_id": "S100YI2M",
+      "category": "方針",
+      "question": "創業の精神として掲げている言葉は何か。",
+      "gold": [
+        {
+          "page": 9,
+          "evidence": "当社の創業の精神「働く者の幸せのために」や経営理念である「われわれ積水化成品グル"
+        }
+      ]
+    },
+    {
+      "id": "dev-033",
+      "split": "dev",
+      "sec_code": "4228",
+      "doc_id": "S100YI2M",
+      "category": "配当",
+      "question": "配当性向はどの程度を目処としているか。",
+      "gold": [
+        {
+          "page": 35,
+          "evidence": "基本方針としております。また、配当政策については、連結配当性向30〜40%を目処"
+        }
+      ]
+    },
+    {
+      "id": "dev-034",
+      "split": "dev",
+      "sec_code": "4228",
+      "doc_id": "S100YI2M",
+      "category": "配当",
+      "question": "期末配当と中間配当を、それぞれ決定するのは誰か。",
+      "gold": [
+        {
+          "page": 35,
+          "evidence": "毎事業年度における配当の回数についての基本方針は、期末配当と中間配当の年2回であ"
+        }
+      ]
+    },
+    {
+      "id": "dev-035",
+      "split": "dev",
+      "sec_code": "4228",
+      "doc_id": "S100YI2M",
+      "category": "リスク",
+      "question": "リスク管理は、どの会議体で評価・審議され、誰に報告されるか。",
+      "gold": [
+        {
+          "page": 16,
+          "evidence": "のとおり管理本部長が分科会長の「コンプライアンス・リスク管理分科会」にて評価・審"
+        }
+      ]
+    },
+    {
+      "id": "dev-036",
+      "split": "dev",
+      "sec_code": "2281",
+      "doc_id": "S100YDH8",
+      "category": "方針",
+      "question": "どのような志のもとで創業した会社か。",
+      "gold": [
+        {
+          "page": 9,
+          "evidence": "当社は、お客様に対する良質な食肉の提供と畜産"
+        }
+      ]
+    },
+    {
+      "id": "dev-037",
+      "split": "dev",
+      "sec_code": "2281",
+      "doc_id": "S100YDH8",
+      "category": "方針",
+      "question": "経営理念として掲げている言葉は何か。",
+      "gold": [
+        {
+          "page": 9,
+          "evidence": "の志を受け継ぎ、「商品と品質はプリマの命」の経"
+        }
+      ]
+    },
+    {
+      "id": "dev-038",
+      "split": "dev",
+      "sec_code": "2281",
+      "doc_id": "S100YDH8",
+      "category": "配当",
+      "question": "配当に関して、目標としている水準は何か。",
+      "gold": [
+        {
+          "page": 38,
+          "evidence": "当社は、株主の皆様への利益配分を経営の重要課題と捉えており、配当性向40%以上を"
+        }
+      ]
+    },
+    {
+      "id": "dev-039",
+      "split": "dev",
+      "sec_code": "2281",
+      "doc_id": "S100YDH8",
+      "category": "配当",
+      "question": "当期の配当額は、何を総合的に勘案して決めたのか。",
+      "gold": [
+        {
+          "page": 38,
+          "evidence": "を継続的に実施していくことを基本方針としております。2025年度の配当は、当事業"
+        }
+      ]
+    },
+    {
+      "id": "dev-040",
+      "split": "dev",
+      "sec_code": "2281",
+      "doc_id": "S100YDH8",
+      "category": "リスク",
+      "question": "リスク情報の進捗を管理するのはどこで、誰に報告されるか。",
+      "gold": [
+        {
+          "page": 20,
+          "evidence": "す。また、当社グループのリスク情報は、当社の主管部署が情報や対策を進捗管理してお"
+        }
+      ]
+    },
+    {
+      "id": "dev-041",
+      "split": "dev",
+      "sec_code": "2730",
+      "doc_id": "S100YDWB",
+      "category": "事業",
+      "question": "国内でどのような業態の店舗を展開している企業か。",
+      "gold": [
+        {
+          "page": 6,
+          "evidence": "主な事業とし、北海道から沖縄まで広範囲にわたり家電量販店等を展開しております。"
+        }
+      ]
+    },
+    {
+      "id": "dev-042",
+      "split": "dev",
+      "sec_code": "2730",
+      "doc_id": "S100YDWB",
+      "category": "リスク",
+      "question": "冷夏や暖冬などの天候は、業績にどのように影響するか。",
+      "gold": [
+        {
+          "page": 26,
+          "evidence": "には季節的要因により売上が左右される商品もあり、夏季における長期的な梅雨、冷夏や"
+        }
+      ]
+    },
+    {
+      "id": "dev-043",
+      "split": "dev",
+      "sec_code": "2730",
+      "doc_id": "S100YDWB",
+      "category": "リスク",
+      "question": "大規模な災害で店舗が被災した場合、どのような損失が想定されているか。",
+      "gold": [
+        {
+          "page": 26,
+          "evidence": "舗等が被災した場合や店舗において火災が発生した場合、被災店舗の営業休止、被害に遭"
+        }
+      ]
+    },
+    {
+      "id": "dev-044",
+      "split": "dev",
+      "sec_code": "2730",
+      "doc_id": "S100YDWB",
+      "category": "方針",
+      "question": "経営理念にある「完全販売」とは、どういう意味か。",
+      "gold": [
+        {
+          "page": 9,
+          "evidence": "優れたサービスを提供し、商品の寿命が尽きるまで最良の状態で使い続けていただく「完"
+        }
+      ]
+    },
+    {
+      "id": "dev-045",
+      "split": "dev",
+      "sec_code": "2730",
+      "doc_id": "S100YDWB",
+      "category": "配当",
+      "question": "剰余金の配当は、年に何回行うことを基本方針としているか。",
+      "gold": [
+        {
+          "page": 45,
+          "evidence": "対し、中間配当を行うことができる。」旨を定款に定めており、中間配当と期末配当の年"
+        }
+      ]
+    },
+    {
+      "id": "dev-046",
+      "split": "dev",
+      "sec_code": "9744",
+      "doc_id": "S100YE6X",
+      "category": "事業",
+      "question": "エンジニア派遣のほかに、どのような事業を行っているか。",
+      "gold": [
+        {
+          "page": 6,
+          "evidence": "エンジニア紹介事業はエンジニアに特化した職業紹介事業を行っております。"
+        }
+      ]
+    },
+    {
+      "id": "dev-047",
+      "split": "dev",
+      "sec_code": "9744",
+      "doc_id": "S100YE6X",
+      "category": "リスク",
+      "question": "エンジニアの常時雇用について、会社が掲げている人員の目標は何人か。",
+      "gold": [
+        {
+          "page": 21,
+          "evidence": "派遣法」)に基づき、2029年3月末目標13,500人を掲げ、多数のエンジニアを"
+        }
+      ]
+    },
+    {
+      "id": "dev-048",
+      "split": "dev",
+      "sec_code": "9744",
+      "doc_id": "S100YE6X",
+      "category": "リスク",
+      "question": "優秀な人材を確保できなくなった場合に、懸念される影響は何か。",
+      "gold": [
+        {
+          "page": 21,
+          "evidence": "しかしながら、他律的な採用競争の激化、あるいは当社グループの信用の失墜等により、"
+        }
+      ]
+    },
+    {
+      "id": "dev-049",
+      "split": "dev",
+      "sec_code": "9744",
+      "doc_id": "S100YE6X",
+      "category": "方針",
+      "question": "リーマンショックの経験から、経営上何を優先してきたのか。",
+      "gold": [
+        {
+          "page": 8,
+          "evidence": "にも配慮しつつ、「自己資本の“質と量”の充実」を優先してきました。"
+        },
+        {
+          "page": 25,
+          "evidence": "にも配慮しつつ、「自己資本の“質と量”の充実」を優先してきました。"
+        }
+      ]
+    },
+    {
+      "id": "dev-050",
+      "split": "dev",
+      "sec_code": "9744",
+      "doc_id": "S100YE6X",
+      "category": "配当",
+      "question": "利益配分を行うための条件は何か。",
+      "gold": [
+        {
+          "page": 35,
+          "evidence": "1. 自己資本の“質と量”が充実していること"
+        }
+      ]
+    },
+    {
+      "id": "heldout-001",
+      "split": "heldout",
+      "sec_code": "2269",
+      "doc_id": "S100YILP",
+      "category": "リスク",
+      "question": "グループ全体の経営リスクを管理するために、どのような専門の部門を設けているか。",
+      "gold": [
+        {
+          "page": 45,
+          "evidence": "て、独立したリスクマネジメント部を設置し、リスクマネジメント部を管掌する執行役員"
+        }
+      ]
+    },
+    {
+      "id": "heldout-002",
+      "split": "heldout",
+      "sec_code": "2269",
+      "doc_id": "S100YILP",
+      "category": "リスク",
+      "question": "個々の経営リスクについて、責任者を置いて回避や軽減の対応を進めているか。",
+      "gold": [
+        {
+          "page": 45,
+          "evidence": "「明治グループにおける経営リスク」を特定しました。各経営リスクにおいてリスクオー"
+        }
+      ]
+    },
+    {
+      "id": "heldout-003",
+      "split": "heldout",
+      "sec_code": "2269",
+      "doc_id": "S100YILP",
+      "category": "方針",
+      "question": "グループの使命として、どのような世界を広げ、どんな期待に応えるとしているか。",
+      "gold": [
+        {
+          "page": 12,
+          "evidence": "私たちの使命は、「おいしさ・楽しさ」の世界を拡げ、「健康・安心」への期待に応えて"
+        }
+      ]
+    },
+    {
+      "id": "heldout-004",
+      "split": "heldout",
+      "sec_code": "2269",
+      "doc_id": "S100YILP",
+      "category": "配当",
+      "question": "株主還元について、目安としている指標と水準は何か。",
+      "gold": [
+        {
+          "page": 79,
+          "evidence": "また、株主の皆様への適切な利益還元についても経営における重要課題として認識し、各"
+        }
+      ]
+    },
+    {
+      "id": "heldout-005",
+      "split": "heldout",
+      "sec_code": "2269",
+      "doc_id": "S100YILP",
+      "category": "配当",
+      "question": "事業で得た資金は、どのような用途に優先して充てる方針か。",
+      "gold": [
+        {
+          "page": 56,
+          "evidence": "事業活動により得た資金は、持続的な成長に向けて、将来への成長投資や研究開発へ積極"
+        },
+        {
+          "page": 79,
+          "evidence": "事業活動により得た資金は、持続的な成長に向けて、将来への成長投資や研究開発へ積極"
+        }
+      ]
+    },
+    {
+      "id": "heldout-006",
+      "split": "heldout",
+      "sec_code": "4997",
+      "doc_id": "S100YATP",
+      "category": "事業",
+      "question": "主力の事業以外に、どのような事業を手がけているか。",
+      "gold": [
+        {
+          "page": 6,
+          "evidence": "事業としては、農薬の製造・販売を主として行っており、この他にも医薬品の製造、関係"
+        }
+      ]
+    },
+    {
+      "id": "heldout-007",
+      "split": "heldout",
+      "sec_code": "4997",
+      "doc_id": "S100YATP",
+      "category": "方針",
+      "question": "掲げているビジョンと、それに込めた使命は何か。",
+      "gold": [
+        {
+          "page": 10,
+          "evidence": "ター」をビジョンに掲げ、世界中の人々の安全で安定的な食の確保とくらしを守ることを"
+        }
+      ]
+    },
+    {
+      "id": "heldout-008",
+      "split": "heldout",
+      "sec_code": "4997",
+      "doc_id": "S100YATP",
+      "category": "配当",
+      "question": "中期経営計画で定めた配当方針の内容は何か。",
+      "gold": [
+        {
+          "page": 39,
+          "evidence": "2025年3月期から始まる中期経営計画「Growing Global for S"
+        }
+      ]
+    },
+    {
+      "id": "heldout-009",
+      "split": "heldout",
+      "sec_code": "4997",
+      "doc_id": "S100YATP",
+      "category": "配当",
+      "question": "期末配当と中間配当は、それぞれどこが決定するのか。",
+      "gold": [
+        {
+          "page": 39,
+          "evidence": "決定機関は、期末配当については株主総会、中間配当については取締役会であります。"
+        }
+      ]
+    },
+    {
+      "id": "heldout-010",
+      "split": "heldout",
+      "sec_code": "4997",
+      "doc_id": "S100YATP",
+      "category": "事業",
+      "question": "グループは全部で何社で構成されているか。",
+      "gold": [
+        {
+          "page": 6,
+          "evidence": "当グループは日本農薬株式会社(当社)及び関係会社26社で構成されており、その内訳"
+        }
+      ]
+    },
+    {
+      "id": "heldout-011",
+      "split": "heldout",
+      "sec_code": "6590",
+      "doc_id": "S100YAST",
+      "category": "リスク",
+      "question": "海外での売上は全体のどの程度を占め、主な地域はどこか。",
+      "gold": [
+        {
+          "page": 23,
+          "evidence": "当社グループの海外売上高比率は約76%となっており、その大部分は台湾、中国であり"
+        }
+      ]
+    },
+    {
+      "id": "heldout-012",
+      "split": "heldout",
+      "sec_code": "6590",
+      "doc_id": "S100YAST",
+      "category": "リスク",
+      "question": "主要な顧客の業界では、どのような競争環境が続いているか。",
+      "gold": [
+        {
+          "page": 23,
+          "evidence": "当社グループの主要顧客であるエレクトロニクス業界は、各製品の価格競争も激しく製造"
+        }
+      ]
+    },
+    {
+      "id": "heldout-013",
+      "split": "heldout",
+      "sec_code": "6590",
+      "doc_id": "S100YAST",
+      "category": "リスク",
+      "question": "製品の品質について、どのような体制で保証しているか。",
+      "gold": [
+        {
+          "page": 23,
+          "evidence": "当社グループでは、ISO9001に基づいた品質保証体制の下、最先端技術を新製品に"
+        }
+      ]
+    },
+    {
+      "id": "heldout-014",
+      "split": "heldout",
+      "sec_code": "6590",
+      "doc_id": "S100YAST",
+      "category": "方針",
+      "question": "長期ビジョンは、何年のありたい姿を描いたものか。",
+      "gold": [
+        {
+          "page": 8,
+          "evidence": "長期ビジョン「芝浦ビジョン2033」では、2033年のありたい姿を「社会やお客様"
+        }
+      ]
+    },
+    {
+      "id": "heldout-015",
+      "split": "heldout",
+      "sec_code": "6590",
+      "doc_id": "S100YAST",
+      "category": "配当",
+      "question": "配当性向は、おおむねどの水準を目途としているか。",
+      "gold": [
+        {
+          "page": 39,
+          "evidence": "その実施につきましては、業績及び財務状況等を総合的に勘案し、連結配当性向は概ね3"
+        }
+      ]
+    },
+    {
+      "id": "heldout-016",
+      "split": "heldout",
+      "sec_code": "7735",
+      "doc_id": "S100YK9N",
+      "category": "事業",
+      "question": "主な事業として扱っている製品にはどのようなものがあるか。",
+      "gold": [
+        {
+          "page": 6,
+          "evidence": "当社グループ(当社および当社の関係会社)は、半導体製造装置、印刷関連機器、ディス"
+        }
+      ]
+    },
+    {
+      "id": "heldout-017",
+      "split": "heldout",
+      "sec_code": "7735",
+      "doc_id": "S100YK9N",
+      "category": "リスク",
+      "question": "米中の関係が悪化した場合、中国向けの出荷にどんな影響が出うるか。",
+      "gold": [
+        {
+          "page": 23,
+          "evidence": "当社グループは、現時点では米中貿易摩擦による業績への影響は大きくないものの、今後"
+        }
+      ]
+    },
+    {
+      "id": "heldout-018",
+      "split": "heldout",
+      "sec_code": "7735",
+      "doc_id": "S100YK9N",
+      "category": "リスク",
+      "question": "市況が下降する局面でも利益を出すために、どのような経営を進めているか。",
+      "gold": [
+        {
+          "page": 24,
+          "evidence": "確実に利益を生み出せるよう、ROIC経営を推進しております。しかしながら、市況が"
+        }
+      ]
+    },
+    {
+      "id": "heldout-019",
+      "split": "heldout",
+      "sec_code": "7735",
+      "doc_id": "S100YK9N",
+      "category": "リスク",
+      "question": "コンプライアンス意識を高める取り組みは、どの担当が主導しているか。",
+      "gold": [
+        {
+          "page": 24,
+          "evidence": "イアンス担当役員および法務担当役員主導のもと、全グループのコンプライアンス意識の"
+        }
+      ]
+    },
+    {
+      "id": "heldout-020",
+      "split": "heldout",
+      "sec_code": "7735",
+      "doc_id": "S100YK9N",
+      "category": "配当",
+      "question": "利益還元の基本方針として、連結配当性向はどの水準以上か。",
+      "gold": [
+        {
+          "page": 42,
+          "evidence": "勘案した上で、株主の皆さまへの利益還元として連結配当性向30%以上とすることを基"
+        }
+      ]
+    },
+    {
+      "id": "heldout-021",
+      "split": "heldout",
+      "sec_code": "7947",
+      "doc_id": "S100YDYF",
+      "category": "事業",
+      "question": "主たる事業は何で、どのような製品を作っているか。",
+      "gold": [
+        {
+          "page": 6,
+          "evidence": "事業」を主たる事業としており、トレー容器・弁当容器等の製造販売を中心として、その"
+        }
+      ]
+    },
+    {
+      "id": "heldout-022",
+      "split": "heldout",
+      "sec_code": "7947",
+      "doc_id": "S100YDYF",
+      "category": "リスク",
+      "question": "原料の価格が上がった場合、製品価格への反映を含めてどう対応するのか。",
+      "gold": [
+        {
+          "page": 18,
+          "evidence": "に左右されにくい安定供給体制のさらなる強化を図っております。また、自助努力で吸収"
+        }
+      ]
+    },
+    {
+      "id": "heldout-023",
+      "split": "heldout",
+      "sec_code": "7947",
+      "doc_id": "S100YDYF",
+      "category": "リスク",
+      "question": "災害で工場が止まった場合に備えて、物流拠点ではどんな備えをしているか。",
+      "gold": [
+        {
+          "page": 18,
+          "evidence": "整えております。また、全国の主要物流22施設すべてに非常用自家発電設備を設置し、"
+        }
+      ]
+    },
+    {
+      "id": "heldout-024",
+      "split": "heldout",
+      "sec_code": "7947",
+      "doc_id": "S100YDYF",
+      "category": "リスク",
+      "question": "人手不足に対して、生産や物流の現場でどのような省力化を進めているか。",
+      "gold": [
+        {
+          "page": 18,
+          "evidence": "当該リスクへの対応策として、当社グループは、生産部門における産業用ロボット導入や"
+        }
+      ]
+    },
+    {
+      "id": "heldout-025",
+      "split": "heldout",
+      "sec_code": "7947",
+      "doc_id": "S100YDYF",
+      "category": "配当",
+      "question": "配当について、減配に対する方針はどうなっているか。",
+      "gold": [
+        {
+          "page": 33,
+          "evidence": "続的かつ安定的に配当を実施する観点から、原則として減配せず、累進配当を実施いたし"
+        }
+      ]
+    },
+    {
+      "id": "heldout-026",
+      "split": "heldout",
+      "sec_code": "8041",
+      "doc_id": "S100YGQH",
+      "category": "リスク",
+      "question": "水産物の価格が動く背景として、どのような要因を挙げているか。",
+      "gold": [
+        {
+          "page": 13,
+          "evidence": "水産物は、その性質上、天然資源であり、漁獲量や養殖生産量等の供給量と需要量のバラ"
+        }
+      ]
+    },
+    {
+      "id": "heldout-027",
+      "split": "heldout",
+      "sec_code": "8041",
+      "doc_id": "S100YGQH",
+      "category": "リスク",
+      "question": "食品の安全性を確保するために、どのような体制を築いているか。",
+      "gold": [
+        {
+          "page": 13,
+          "evidence": "ります。この考えのもと、取扱商品・製品の安全性や品質等を確保するため、品質管理部"
+        }
+      ]
+    },
+    {
+      "id": "heldout-028",
+      "split": "heldout",
+      "sec_code": "8041",
+      "doc_id": "S100YGQH",
+      "category": "リスク",
+      "question": "大規模な自然災害に備えて、拠点の選定や建物でどのような配慮をしているか。",
+      "gold": [
+        {
+          "page": 13,
+          "evidence": "拠点候補地の選定にあたっては災害等の顕在化する可能性等を勘案して行うとともに、建"
+        }
+      ]
+    },
+    {
+      "id": "heldout-029",
+      "split": "heldout",
+      "sec_code": "8041",
+      "doc_id": "S100YGQH",
+      "category": "方針",
+      "question": "経営理念として掲げているのは、どのような内容か。",
+      "gold": [
+        {
+          "page": 8,
+          "evidence": "当社グループは、「水産物をコアとし、お客様に価値ある商品とサービスを提供すること"
+        }
+      ]
+    },
+    {
+      "id": "heldout-030",
+      "split": "heldout",
+      "sec_code": "8041",
+      "doc_id": "S100YGQH",
+      "category": "配当",
+      "question": "配当の目途としている指標は何か。",
+      "gold": [
+        {
+          "page": 25,
+          "evidence": "連結株主資本配当率(DOE)2.4%を目途に安定的な配当水準を維持することを基本"
+        }
+      ]
+    },
+    {
+      "id": "heldout-031",
+      "split": "heldout",
+      "sec_code": "8881",
+      "doc_id": "S100YK7Q",
+      "category": "リスク",
+      "question": "建築資材が確保できない場合、売上の計上時期にどんな影響が出るか。",
+      "gold": [
+        {
+          "page": 14,
+          "evidence": "できずにプロジェクトに係る売上・利益の計上が計画に対して翌期にずれ込む可能性があ"
+        }
+      ]
+    },
+    {
+      "id": "heldout-032",
+      "split": "heldout",
+      "sec_code": "8881",
+      "doc_id": "S100YK7Q",
+      "category": "リスク",
+      "question": "マンション事業では、用地の取得から引渡しまでにどのくらいの期間がかかるか。",
+      "gold": [
+        {
+          "page": 14,
+          "evidence": "不動産事業においては、マンション分譲用地の取得から顧客への引渡しまでに2〜3年を"
+        }
+      ]
+    },
+    {
+      "id": "heldout-033",
+      "split": "heldout",
+      "sec_code": "8881",
+      "doc_id": "S100YK7Q",
+      "category": "リスク",
+      "question": "プロジェクトの資金繰りについて、どのような対応をとっているか。",
+      "gold": [
+        {
+          "page": 14,
+          "evidence": "含めたプロジェクト利益を精査する事前申請体制のもと慎重に検討し、資金繰に関しては"
+        }
+      ]
+    },
+    {
+      "id": "heldout-034",
+      "split": "heldout",
+      "sec_code": "8881",
+      "doc_id": "S100YK7Q",
+      "category": "リスク",
+      "question": "建設事業で採算を確保するために、どのような営業や調達を行うのか。",
+      "gold": [
+        {
+          "page": 14,
+          "evidence": "その対応策として、採算が確保できる受注に向けて付加価値提案型営業を一層展開すると"
+        }
+      ]
+    },
+    {
+      "id": "heldout-035",
+      "split": "heldout",
+      "sec_code": "8881",
+      "doc_id": "S100YK7Q",
+      "category": "配当",
+      "question": "配当性向の目安は、いつからどの水準に変更されたか。",
+      "gold": [
+        {
+          "page": 26,
+          "evidence": "に、長期的な安定配当を維持することを基本方針としております。また、2024年3月"
+        }
+      ]
+    },
+    {
+      "id": "heldout-036",
+      "split": "heldout",
+      "sec_code": "8934",
+      "doc_id": "S100YGKR",
+      "category": "事業",
+      "question": "貸会議室事業では、どのような価値の最大化に取り組んでいるか。",
+      "gold": [
+        {
+          "page": 6,
+          "evidence": "東京都心オフィスビルの「空間」と「時間」の価値最大化に取り組んでおり、貸会議室事"
+        }
+      ]
+    },
+    {
+      "id": "heldout-037",
+      "split": "heldout",
+      "sec_code": "8934",
+      "doc_id": "S100YGKR",
+      "category": "リスク",
+      "question": "不動産市況が悪化すると、どのような形で業績に影響しうるか。",
+      "gold": [
+        {
+          "page": 21,
+          "evidence": "た不動産サービスをワンストップで展開しております。しかしながら、経済情勢が悪化し"
+        }
+      ]
+    },
+    {
+      "id": "heldout-038",
+      "split": "heldout",
+      "sec_code": "8934",
+      "doc_id": "S100YGKR",
+      "category": "リスク",
+      "question": "再生事業の資金調達は主にどのように行い、何が問題になりうるか。",
+      "gold": [
+        {
+          "page": 22,
+          "evidence": "2 リプランニング事業は、主に金融機関からの借入により資金調達し物件を購入するた"
+        }
+      ]
+    },
+    {
+      "id": "heldout-039",
+      "split": "heldout",
+      "sec_code": "8934",
+      "doc_id": "S100YGKR",
+      "category": "方針",
+      "question": "社是として掲げているのは何か。",
+      "gold": [
+        {
+          "page": 9,
+          "evidence": "当社グループは、創業以来「利他」(=思いやりの心)を社是として掲げ、「全従業員を"
+        }
+      ]
+    },
+    {
+      "id": "heldout-040",
+      "split": "heldout",
+      "sec_code": "8934",
+      "doc_id": "S100YGKR",
+      "category": "配当",
+      "question": "配当は年に何回、いつを基準日として行う方針か。",
+      "gold": [
+        {
+          "page": 43,
+          "evidence": "当社は、中間配当を行うことができる旨を定款に定めており、毎年3月31日及び9月3"
+        }
+      ]
+    },
+    {
+      "id": "heldout-041",
+      "split": "heldout",
+      "sec_code": "9143",
+      "doc_id": "S100Y9P7",
+      "category": "事業",
+      "question": "デリバリー事業で集荷や営業を担うドライバーは何人いるか。",
+      "gold": [
+        {
+          "page": 6,
+          "evidence": "本事業推進を実現するために、当社グループでは、デリバリー事業のセールスドライバー"
+        }
+      ]
+    },
+    {
+      "id": "heldout-042",
+      "split": "heldout",
+      "sec_code": "9143",
+      "doc_id": "S100Y9P7",
+      "category": "リスク",
+      "question": "個人宅向けの輸送は、どの程度を外部の企業に委託しているか。",
+      "gold": [
+        {
+          "page": 27,
+          "evidence": "獲得に最大限活用しております。そのため、個人宅(to C)への輸送業務のうち7割"
+        }
+      ]
+    },
+    {
+      "id": "heldout-043",
+      "split": "heldout",
+      "sec_code": "9143",
+      "doc_id": "S100Y9P7",
+      "category": "リスク",
+      "question": "特定の事業への依存度は、連結営業収益のどれくらいか。",
+      "gold": [
+        {
+          "page": 29,
+          "evidence": "デリバリー事業は、当社グループの連結営業収益の6割超を占める主要な事業であります"
+        }
+      ]
+    },
+    {
+      "id": "heldout-044",
+      "split": "heldout",
+      "sec_code": "9143",
+      "doc_id": "S100Y9P7",
+      "category": "方針",
+      "question": "創業の精神として掲げているものは何か。",
+      "gold": [
+        {
+          "page": 12,
+          "evidence": "当社グループは、創業の精神である、常にお客さまに誠心誠意尽くすという「飛脚の精神"
+        }
+      ]
+    },
+    {
+      "id": "heldout-045",
+      "split": "heldout",
+      "sec_code": "9143",
+      "doc_id": "S100Y9P7",
+      "category": "配当",
+      "question": "中期経営計画で掲げている、株主還元の数値目標は何か。",
+      "gold": [
+        {
+          "page": 52,
+          "evidence": "この方針のもと、中期経営計画においては、配当及び自己株式取得を通じた3か年累計で"
+        }
+      ]
+    },
+    {
+      "id": "heldout-046",
+      "split": "heldout",
+      "sec_code": "9900",
+      "doc_id": "S100YGZJ",
+      "category": "事業",
+      "question": "グループの主な事業の内容は何か。",
+      "gold": [
+        {
+          "page": 7,
+          "evidence": "当社グループは、当社及び子会社7社で構成され、飲食店の経営、フランチャイズ(FC"
+        }
+      ]
+    },
+    {
+      "id": "heldout-047",
+      "split": "heldout",
+      "sec_code": "9900",
+      "doc_id": "S100YGZJ",
+      "category": "リスク",
+      "question": "食材の仕入価格が上がる要因として、何が挙げられているか。",
+      "gold": [
+        {
+          "page": 17,
+          "evidence": "ておりますが、鳥インフルエンザ等を始めとする疫病や大規模な自然災害、仕入先の環境"
+        }
+      ]
+    },
+    {
+      "id": "heldout-048",
+      "split": "heldout",
+      "sec_code": "9900",
+      "doc_id": "S100YGZJ",
+      "category": "リスク",
+      "question": "不採算の店舗が出た場合、会計上どのような影響が生じうるか。",
+      "gold": [
+        {
+          "page": 18,
+          "evidence": "まれない場合、もしくは土地等の時価が著しく下落した場合において、当該固定資産につ"
+        }
+      ]
+    },
+    {
+      "id": "heldout-049",
+      "split": "heldout",
+      "sec_code": "9900",
+      "doc_id": "S100YGZJ",
+      "category": "リスク",
+      "question": "情報が漏洩した場合、どのような影響が懸念されているか。",
+      "gold": [
+        {
+          "page": 18,
+          "evidence": "使用する可能性があり、このような事態が生じた場合、損害賠償や社会的信用の低下等に"
+        }
+      ]
+    },
+    {
+      "id": "heldout-050",
+      "split": "heldout",
+      "sec_code": "9900",
+      "doc_id": "S100YGZJ",
+      "category": "方針",
+      "question": "グループビジョンは何か。",
+      "gold": [
+        {
+          "page": 9,
+          "evidence": "当社グループでは、グループビジョンである「No.1 Noodle Restaur"
+        },
+        {
+          "page": 65,
+          "evidence": "当社グループでは、グループビジョンである「No.1 Noodle Restaur"
+        }
+      ]
+    }
+  ]
+}
