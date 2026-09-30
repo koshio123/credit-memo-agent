@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from llm.local import OllamaBackend
+from llm.local import PROMPT_OVERHEAD_TOKENS, TOKENS_PER_CHAR_UPPER_BOUND, OllamaBackend
 from llm.types import LLMBackendError, LLMRequest, Message
 
 pytestmark = pytest.mark.anyio
@@ -13,7 +13,7 @@ def _backend(handler: httpx.MockTransport) -> OllamaBackend:
     return OllamaBackend(
         base_url="http://ollama.test",
         models={"fast": "small", "standard": "mid", "strong": "large"},
-        num_ctx=1000,
+        num_ctx=10_000,
         client=httpx.AsyncClient(transport=handler),
     )
 
@@ -54,7 +54,7 @@ async def test_リクエストを組み立てて応答を読む() -> None:
         ],
         "stream": False,
         "think": False,
-        "options": {"temperature": 0.2, "num_predict": 256, "num_ctx": 1000},
+        "options": {"temperature": 0.2, "num_predict": 256, "num_ctx": 10_000},
     }
     assert res.text == "自己資本比率は45.3%です。"
     assert (res.backend, res.model) == ("local", "large")
@@ -115,17 +115,6 @@ async def test_打ち切られた応答にはtruncatedを立てる(
     assert res.truncated is truncated
 
 
-async def test_プロンプトがnum_ctxに達したら黙って切り詰められた可能性としてエラーにする() -> None:
-    payload = {
-        "message": {"role": "assistant", "content": "もっともらしい答え"},
-        "prompt_eval_count": 1000,  # num_ctx=1000 に達している
-    }
-    backend = _backend(httpx.MockTransport(lambda _: httpx.Response(200, json=payload)))
-
-    with pytest.raises(LLMBackendError, match="num_ctx"):
-        await backend.complete(LLMRequest(messages=[Message(role="user", content="x")]))
-
-
 async def test_thinkの設定をそのまま送る() -> None:
     bodies: list[dict[str, object]] = []
 
@@ -160,3 +149,60 @@ def test_cache_saltにnum_ctxとthinkが入る() -> None:
     }
 
     assert len(salts) == 3
+
+
+def _sized_backend(num_ctx: int, calls: list[int]) -> OllamaBackend:
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        return httpx.Response(200, json={"message": {"role": "assistant", "content": "ok"}})
+
+    return OllamaBackend(
+        base_url="http://ollama.test",
+        models={"fast": "s", "standard": "m", "strong": "l"},
+        num_ctx=num_ctx,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+
+
+def _request_of(chars: int, max_tokens: int) -> LLMRequest:
+    return LLMRequest(
+        messages=[Message(role="user", content="あ" * chars)], tier="fast", max_tokens=max_tokens
+    )
+
+
+async def test_num_ctxに収まらない入力は送信せずエラーにする() -> None:
+    # Ollama は収まらない入力を黙って切り詰め、応答の prompt_eval_count も切り詰め後の値を返す。
+    # 実機で確認済み（4426トークンの入力が258トークンとして「成功」した）ので、送る前に止める
+    calls: list[int] = []
+    backend = _sized_backend(num_ctx=1000, calls=calls)
+
+    with pytest.raises(LLMBackendError, match="num_ctx"):
+        await backend.complete(_request_of(chars=2000, max_tokens=100))
+
+    assert calls == []
+
+
+async def test_収まる限界ちょうどの入力は送り_1文字超えたら止める() -> None:
+    num_ctx, max_tokens = 1000, 100
+    limit_chars = int((num_ctx - max_tokens - PROMPT_OVERHEAD_TOKENS) / TOKENS_PER_CHAR_UPPER_BOUND)
+    calls: list[int] = []
+    backend = _sized_backend(num_ctx, calls)
+
+    res = await backend.complete(_request_of(limit_chars, max_tokens))
+    assert res.text == "ok"
+
+    with pytest.raises(LLMBackendError, match="num_ctx"):
+        await backend.complete(_request_of(limit_chars + 1, max_tokens))
+    assert len(calls) == 1
+
+
+async def test_systemも見積もりに含める() -> None:
+    calls: list[int] = []
+    backend = _sized_backend(num_ctx=1000, calls=calls)
+    request = LLMRequest(
+        system="い" * 1500, messages=[Message(role="user", content="x")], tier="fast", max_tokens=10
+    )
+
+    with pytest.raises(LLMBackendError, match="num_ctx"):
+        await backend.complete(request)
+    assert calls == []

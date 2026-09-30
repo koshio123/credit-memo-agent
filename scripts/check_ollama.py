@@ -13,6 +13,7 @@ from llm.settings import LLMSettings
 from llm.types import LLMBackendError, LLMRequest, Message
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
+logging.getLogger("httpx").setLevel(logging.WARNING)
 log = logging.getLogger("check_ollama")
 
 

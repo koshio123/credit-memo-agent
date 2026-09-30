@@ -46,7 +46,7 @@ brew install ollama          # 0.35.0
 
 | モデル | 用途 | サイズ | 状態 |
 | --- | --- | --- | --- |
-| `qwen3:8b` | 分類・抽出など軽い処理、開発中の反復 | 約 5.2GB | **取得中**（2026-09-30 時点で約 1.5GB。回線が遅く、途中で止まるため取得をやり直しながら進めている） |
+| `qwen3:8b` | 開発中の反復、形式・配線の確認 | 5.2GB | **取得済み**（2026-09-30。回線が遅く、途中で何度も止まったため、監視スクリプトで取得をやり直しながら進めた） |
 | `qwen3:14b` | 分析・起草 | 約 9GB | **未取得**（後回しにした） |
 | VLM（Qwen2.5-VL 7B 級） | PDF の図表の読み取り | 未定 | **未取得**（W1 で必要になったら取得する） |
 
@@ -54,6 +54,7 @@ brew install ollama          # 0.35.0
 
 - 取得が止まったときは `ollama pull qwen3:8b` をもう一度実行すれば、途中から再開する。
 - 進捗は `du` では測れない（Ollama が先に領域を確保するため過大に見える）。`~/.ollama/models/blobs/*-partial-*` の JSON の `Completed` / `Size` を見る。
+- 8B は金融の基礎知識で誤りが出る（自己資本比率の定義を取り違えた）。反復用に限り、内容の品質はClaudeで評価する。→ decisions.md
 - **設定の既定値は `qwen3:14b` を指している。** 8B しかない間は、`.env` で次のように上書きしないと、存在しないモデルを呼んで失敗する。
 
   ```
@@ -86,7 +87,7 @@ brew install ollama          # 0.35.0
 - **`.venv/`**: `uv sync` で作る仮想環境（Python 3.14.7）。
 - **`.git/hooks/pre-commit`**: `uv run pre-commit install` で入る。クローンし直したら再実行が必要。
 - **`.git/info/exclude`**: 公開しない個人メモ 1 ファイルを追跡対象から外す一行（ファイル名はそちらを参照）。`.gitignore` に書くと公開リポジトリにファイル名が残るので、こちらに書いた。クローンしても引き継がれない。
-- **`.env`**: **まだ作っていない。** `.env.example` をコピーして作る（§7）。
+- **`.env`**: `.env.example` からコピーして作成済み。`LOCAL_MODEL_STANDARD/STRONG` は 8B に向け、`EDINET_API_KEY` を設定した。git の追跡対象外（`.gitignore`）。キーを表示させないため、編集後は読まない。
 - **リモート**: `origin` は `https://github.com/koshio123/credit-memo-agent.git` に設定されているが、**何もプッシュしていない**。リポジトリが GitHub 側にあるかも未確認。
 
 ## 4. リポジトリに入れたファイル（コミットされる）
@@ -137,7 +138,6 @@ brew install ollama          # 0.35.0
 | プロセス | 目的 |
 | --- | --- |
 | `ollama serve` | Ollama のサーバー（`127.0.0.1:11434`）。手動で起動 |
-| `ollama pull qwen3:8b` と監視スクリプト | 取得が 4 分間進まなかったら自動でやり直す。取得が終わると終了する |
 
 止めるとき: `pkill -f "ollama pull"`、`pkill -f "ollama serve"`。
 
@@ -178,10 +178,9 @@ Claude Code 経由を使う場合は、Claude Code に自分のアカウント�
 
 | 項目 | 状態 |
 | --- | --- |
-| `qwen3:8b` の取得 | 取得中 |
-| Ollama との実機確認（`think` の受理、`done_reason`、`num_ctx` の切り捨て検知） | 取得完了後に `scripts/check_ollama.py` で行う。現状の `llm/local.py` は HTTP をモックしたテストでしか確認していない |
-| EDINET API キー | 未取得（ユーザーの操作が必要） |
-| 対象企業 10 社の選定 | キーの取得後 |
+| Ollama との実機確認 | **完了**（`think`・`done_reason`・入力の切り捨て。結果は decisions.md） |
+| EDINET API キー | 取得・設定済み。確認スクリプトの初回実行でキーが画面に出たが、ユーザーの判断で再発行はしていない。原因は修正済み |
+| 対象企業 10 社の選定 | 作業中 |
 | GitHub へのプッシュ・CI の初回実行 | 未実施 |
 | `edinet-mcp` と Agent SDK の接続 | W2 で確認 |
 | `anthropic_api` バックエンド | 未実装（選ぶと `NotImplementedError`） |

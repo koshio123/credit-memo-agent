@@ -1,7 +1,19 @@
+import math
+
 import httpx
 from pydantic import BaseModel, ValidationError
 
 from llm.types import LLMBackendError, LLMRequest, LLMResponse, Tier, Usage
+
+# 入力の大きさは送る前に見積もる。Ollama は num_ctx に収まらない入力を黙って切り詰め、
+# 応答の prompt_eval_count も切り詰め後の値を返すため、応答からは切り捨てを確実に検知できない
+# （実機で確認: 4426トークンの入力が、警告ログだけで258トークンとして「成功」した）。
+# Qwen3 のトークナイザでの実測（1文字あたり）: 日本語の散文 0.69 / 数値の表 0.89 /
+# 有報風の文章 0.95。1.0 を上限として見積もれば、これらを過小評価しない。
+# 英数字が多い入力は過大評価になる（安全側）。
+TOKENS_PER_CHAR_UPPER_BOUND = 1.0
+# チャットのテンプレート（役割タグなど）の分の余裕
+PROMPT_OVERHEAD_TOKENS = 64
 
 
 class _ChatMessage(BaseModel):
@@ -49,7 +61,19 @@ class OllamaBackend:
     def model_for(self, tier: Tier) -> str:
         return self._models[tier]
 
+    def _check_fits(self, request: LLMRequest) -> None:
+        chars = len(request.system) + sum(len(m.content) for m in request.messages)
+        estimated = math.ceil(chars * TOKENS_PER_CHAR_UPPER_BOUND) + PROMPT_OVERHEAD_TOKENS
+        if estimated + request.max_tokens > self.num_ctx:
+            raise LLMBackendError(
+                f"入力が num_ctx={self.num_ctx} に収まらない可能性があります"
+                f"（入力の見積もり {estimated} + max_tokens {request.max_tokens}）。"
+                "Ollama は収まらない入力を黙って切り捨てるため、送信を中止しました。"
+                "num_ctx を上げるか、入力を減らしてください"
+            )
+
     async def complete(self, request: LLMRequest) -> LLMResponse:
+        self._check_fits(request)
         model = self.model_for(request.tier)
         messages = [m.model_dump() for m in request.messages]
         if request.system:
@@ -79,14 +103,6 @@ class OllamaBackend:
             parsed = _ChatResponse.model_validate_json(res.content)
         except ValidationError as e:
             raise LLMBackendError(f"Ollama の応答を解釈できません: {e}") from e
-        if parsed.prompt_eval_count >= self.num_ctx:
-            # 入力が上限に達している。先頭が切り捨てられた状態で、もっともらしい答えが返っている。
-            # あくまで補助的な検知: Ollama がプロンプトのキャッシュを再利用すると、この値は
-            # 実際より小さく出て見逃す。確実に防ぐには、呼び出し側で入力量を制御する。
-            raise LLMBackendError(
-                f"プロンプトが num_ctx={self.num_ctx} に達しました。入力が切り捨てられた可能性が"
-                "あるため応答を採用しません。num_ctx を上げるか、入力を減らしてください"
-            )
         return LLMResponse(
             text=parsed.message.content,
             backend=self.name,
