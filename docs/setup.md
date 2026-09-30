@@ -1,0 +1,187 @@
+# 開発環境のセットアップ記録
+
+この環境に対して行った初期設定をすべて記録する。何を、どこに、なぜ入れたか、どう元に戻すかを書く。設計上の判断の理由は [decisions.md](decisions.md) にあり、ここでは重複させない。
+
+記録日: 2026-09-30 / 対象: Apple M4 Pro・24GB・macOS
+
+## 1. 全体の一覧
+
+| # | 内容 | 場所 | 種類 |
+| --- | --- | --- | --- |
+| 1 | uv と Python 3.14.7 | `~/.local/`（uv 管理） | マシンの環境 |
+| 2 | Homebrew の `ollama` 0.35.0 | `/opt/homebrew/` | マシンの環境 |
+| 3 | Ollama のモデル（`qwen3:8b`、取得中） | `~/.ollama/` | マシンの環境 |
+| 4 | Docker イメージ・ボリューム | Docker Desktop の内部 | マシンの環境 |
+| 5 | Python の依存パッケージ | リポジトリの `.venv/` | リポジトリ（gitignore） |
+| 6 | pre-commit のフック | `.git/hooks/pre-commit` | リポジトリ（コミットされない） |
+| 7 | 個人メモを追跡対象から外す設定 | `.git/info/exclude` | リポジトリ（コミットされない） |
+| 8 | ツール設定・CI・規約・hook | リポジトリのファイル | リポジトリ（コミットされる） |
+| 9 | 起動中のバックグラウンドプロセス | 現在のセッション | 一時的 |
+
+## 2. マシンの環境に入れたもの（リポジトリの外）
+
+### 2.1 uv と Python 3.14.7
+
+- uv 0.12.9 は元から入っていた。Python 3.14.7 は uv が管理する版を使う（`.python-version` で 3.14 に固定）。
+- pyenv の Python 3.12.8 も入っているが、このプロジェクトでは使わない。
+- 経緯: `requires-python = ">=3.12"` だけだと uv が最新の 3.14 を選び、ruff・pyright の対象（3.12）とずれていた。3.14 にそろえた。→ decisions.md「Pythonを3.14に固定」
+
+### 2.2 Ollama（ローカル LLM の実行環境）
+
+```bash
+brew install ollama          # 0.35.0
+```
+
+- **サービスとして常駐させていない。** `brew services start ollama` は実行していない（ログイン時に自動起動するため）。必要なときだけ手動で起動する。
+- 起動コマンド（brew が推奨した環境変数付き）:
+
+  ```bash
+  OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0 ollama serve
+  ```
+
+- Ollama の既定のコンテキスト長は 4096 トークン（サーバーのログで確認）。超えた入力は黙って切り捨てられるため、`llm/local.py` で `num_ctx` を明示している（既定 16384）。→ decisions.md「Ollama特有の落とし穴への対処」
+- 元に戻す: `brew uninstall ollama` と `rm -rf ~/.ollama`（モデルも消える）。
+
+### 2.3 Ollama のモデル
+
+| モデル | 用途 | サイズ | 状態 |
+| --- | --- | --- | --- |
+| `qwen3:8b` | 分類・抽出など軽い処理、開発中の反復 | 約 5.2GB | **取得中**（2026-09-30 時点で約 1.5GB。回線が遅く、途中で止まるため取得をやり直しながら進めている） |
+| `qwen3:14b` | 分析・起草 | 約 9GB | **未取得**（後回しにした） |
+| VLM（Qwen2.5-VL 7B 級） | PDF の図表の読み取り | 未定 | **未取得**（W1 で必要になったら取得する） |
+
+注意:
+
+- 取得が止まったときは `ollama pull qwen3:8b` をもう一度実行すれば、途中から再開する。
+- 進捗は `du` では測れない（Ollama が先に領域を確保するため過大に見える）。`~/.ollama/models/blobs/*-partial-*` の JSON の `Completed` / `Size` を見る。
+- **設定の既定値は `qwen3:14b` を指している。** 8B しかない間は、`.env` で次のように上書きしないと、存在しないモデルを呼んで失敗する。
+
+  ```
+  LOCAL_MODEL_STANDARD=qwen3:8b
+  LOCAL_MODEL_STRONG=qwen3:8b
+  ```
+
+- Claude 側のモデル（`claude-haiku-4-5` / `claude-sonnet-5-5` / `claude-opus-5-5`）はインストール不要で、Claude Code のログイン経由で使う。3 つとも使えることを実機で確認済み。
+
+### 2.4 Docker
+
+`docker compose up -d --wait` で次のものができる。
+
+| 種類 | 名前 | 内容 |
+| --- | --- | --- |
+| イメージ | `credit-memo-agent-db:local`（約 660MB） | `pgvector/pgvector:pg17` に pg_bigm（v1.2-20250903）をソースからビルドして追加 |
+| ボリューム | `credit-memo-agent_pgdata` | PostgreSQL のデータ。現在は拡張（vector, pg_bigm）が入っているだけ |
+| コンテナ | なし（`docker compose down` で停止・削除済み） | 起動時は `db` |
+
+- ホスト側のポートは **5433**（手元の PostgreSQL 17 が 5432 を使う可能性があるため）。`127.0.0.1` にだけ公開している。
+- 拡張の作成は、データディレクトリが空の初回起動でしか走らない。`docker/postgres/init/` を変えたら `docker compose down -v` でボリュームを消す。
+- 元に戻す: `docker compose down -v && docker rmi credit-memo-agent-db:local`。
+
+### 2.5 pre-commit のキャッシュ
+
+`pre-commit-hooks`（外部リポジトリ）の環境が `~/.cache/pre-commit/` に作られた。消しても再作成される。
+
+## 3. リポジトリの中にだけあるもの（コミットされない）
+
+- **`.venv/`**: `uv sync` で作る仮想環境（Python 3.14.7）。
+- **`.git/hooks/pre-commit`**: `uv run pre-commit install` で入る。クローンし直したら再実行が必要。
+- **`.git/info/exclude`**: 公開しない個人メモ 1 ファイルを追跡対象から外す一行（ファイル名はそちらを参照）。`.gitignore` に書くと公開リポジトリにファイル名が残るので、こちらに書いた。クローンしても引き継がれない。
+- **`.env`**: **まだ作っていない。** `.env.example` をコピーして作る（§7）。
+- **リモート**: `origin` は `https://github.com/koshio123/credit-memo-agent.git` に設定されているが、**何もプッシュしていない**。リポジトリが GitHub 側にあるかも未確認。
+
+## 4. リポジトリに入れたファイル（コミットされる）
+
+### 4.1 ツールと品質ゲート
+
+| ファイル | 役割 |
+| --- | --- |
+| `pyproject.toml` | 依存、ruff（lint・整形）、pyright（strict）、pytest の設定。`[tool.uv] package = false`（配布しないアプリ） |
+| `.python-version` | Python 3.14 に固定 |
+| `uv.lock` | 依存の固定 |
+| `.pre-commit-config.yaml` | コミット時に ruff・pyright・pytest、秘密鍵・巨大ファイル検出などを実行 |
+| `.github/workflows/ci.yml` | push / PR で ruff・pyright・pytest（`-m "not llm"`）を実行。**まだ一度も動かしていない** |
+| `.claude/settings.json` | Claude Code の PostToolUse hook。`Write`/`Edit` で `.py` を編集した後に呼ぶ |
+| `.claude/format-python.sh` | hook の中身。`ruff check --fix` → `ruff format` を自動実行し、直せない違反は編集直後にエラーとして返す |
+| `CLAUDE.md` | 開発規約（型必須、LLM 呼び出しは `llm/` 経由、秘密情報は `.env` のみ、Claude 利用は少量・手動のみ、など） |
+| `.gitignore` | `.env`、`data/`、`.cache/`、`.venv/` など |
+| `.env.example` | 環境変数のひな形（§7） |
+
+### 4.2 実装・データ・文書
+
+| ファイル | 内容 |
+| --- | --- |
+| `docker-compose.yml`、`docker/postgres/` | PostgreSQL（pgvector + pg_bigm）の環境 |
+| `llm/` | LLM 呼び出しの抽象（型、キャッシュ、Ollama、Claude Code、テスト用の偽バックエンド、設定、ファクトリ） |
+| `tests/` | 上記のテスト（42 件） |
+| `scripts/check_ollama.py`、`scripts/check_claude_code.py` | 実機との接続確認。CI では実行しない。`uv run python -m scripts.<名前>` で実行 |
+| `policies/credit_policy.md` | **架空の**融資内規（条文番号付き。財務指標の算式と境界値を附則で定義） |
+| `templates/credit_memo.md` | 与信メモの雛形 |
+| `PLAN.md`、`docs/decisions.md`、`docs/setup.md` | 計画、設計判断ログ、この記録 |
+
+## 5. 依存パッケージ
+
+実行時（`uv add` したもの。他は推移的依存）:
+
+| パッケージ | 用途 |
+| --- | --- |
+| `pydantic` 2.13 / `pydantic-settings` 2.15 | 型付きのデータと、環境変数・`.env` からの設定 |
+| `httpx` 0.28 | Ollama への HTTP 呼び出し |
+| `claude-agent-sdk` 0.2.162 | Claude Code 経由の呼び出し。Anthropic の CLI を同梱している |
+
+開発時（`dev` グループ）: `ruff` 0.16.9、`pyright` 1.1.414、`pytest` 9.1.1、`pre-commit` 4.6.2。
+
+## 6. 現在起動しているプロセス
+
+この作業セッションで起動したもの。マシンを再起動すれば消える。
+
+| プロセス | 目的 |
+| --- | --- |
+| `ollama serve` | Ollama のサーバー（`127.0.0.1:11434`）。手動で起動 |
+| `ollama pull qwen3:8b` と監視スクリプト | 取得が 4 分間進まなかったら自動でやり直す。取得が終わると終了する |
+
+止めるとき: `pkill -f "ollama pull"`、`pkill -f "ollama serve"`。
+
+## 7. 環境変数（`.env.example` の要点）
+
+| 変数 | 意味 |
+| --- | --- |
+| `LLM_BACKEND` | `local`（既定） / `claude_code` / `anthropic_api`（未実装） |
+| `OLLAMA_BASE_URL`、`LOCAL_MODEL_FAST/STANDARD/STRONG` | Ollama の接続先と、段階ごとのモデル |
+| `LOCAL_NUM_CTX`（既定 16384）、`LOCAL_THINK`（既定 false） | コンテキスト長と、思考モード |
+| `CLAUDE_MODEL_FAST/STANDARD/STRONG`、`CLAUDE_THINK` | Claude 側のモデル（完全な ID で固定）と思考モード |
+| `LLM_CACHE_ENABLED`、`LLM_CACHE_DIR` | 応答キャッシュ（既定は有効、`.cache/llm`） |
+| `POSTGRES_*`、`DATABASE_URL` | PostgreSQL の接続情報（ポートは 5433） |
+| `EDINET_API_KEY` | EDINET API v2 のキー。**未取得** |
+
+**`ANTHROPIC_API_KEY` と `ANTHROPIC_AUTH_TOKEN` は環境に置かない。** あると Claude Code が API 課金で動くため、`claude_code` バックエンドが作成を拒否する。
+
+## 8. 新しいマシンで再現する手順
+
+```bash
+git clone <このリポジトリ> && cd credit-memo-agent
+uv sync                                  # Python 3.14 と依存を用意
+uv run pre-commit install                # コミット時の検査を有効にする
+cp .env.example .env                     # 必要な値を編集（EDINET_API_KEY など）
+
+docker compose up -d --wait              # PostgreSQL（初回はイメージのビルドに数分）
+
+brew install ollama                      # ローカル LLM を使う場合
+OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0 ollama serve &
+ollama pull qwen3:8b
+
+uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run pytest
+```
+
+Claude Code 経由を使う場合は、Claude Code に自分のアカウントでログインしておく（API キーは不要）。
+
+## 9. 未完了・未確認
+
+| 項目 | 状態 |
+| --- | --- |
+| `qwen3:8b` の取得 | 取得中 |
+| Ollama との実機確認（`think` の受理、`done_reason`、`num_ctx` の切り捨て検知） | 取得完了後に `scripts/check_ollama.py` で行う。現状の `llm/local.py` は HTTP をモックしたテストでしか確認していない |
+| EDINET API キー | 未取得（ユーザーの操作が必要） |
+| 対象企業 10 社の選定 | キーの取得後 |
+| GitHub へのプッシュ・CI の初回実行 | 未実施 |
+| `edinet-mcp` と Agent SDK の接続 | W2 で確認 |
+| `anthropic_api` バックエンド | 未実装（選ぶと `NotImplementedError`） |
