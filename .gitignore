@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.pyright/
+*.egg-info/
+dist/
+build/
+
+# 環境変数・秘密情報
+.env
+.env.*
+!.env.example
+
+# データ・キャッシュ（取得スクリプトで再生成する）
+data/
+.cache/
+llm_cache/
+
+# Node
+node_modules/
+web/.next/
+web/out/
+
+# エディタ・OS
+.DS_Store
+.idea/
+.vscode/
+
+# Claude Code（個人用設定）
+.claude/settings.local.json
