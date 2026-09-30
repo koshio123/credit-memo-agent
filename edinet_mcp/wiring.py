@@ -1,15 +1,51 @@
 """実データ（data/、PostgreSQL、埋め込みモデル）につないで、サービスを組み立てる。"""
 
+import threading
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from edinet_mcp.service import EdinetService
+import psycopg
+
+from edinet_mcp.service import EdinetMcpError, EdinetService, Searcher
 from evals.companies import load_dataset
 from ingest.pdf_baseline import cached_pages
 from ingest.xbrl_facts import read_facts
 from retrieval.embedding import MODELS, SentenceTransformerEmbedder
 from retrieval.search import Retriever
 from retrieval.settings import DatabaseSettings
-from retrieval.store import ChunkStore
+from retrieval.store import ChunkStore, Hit
+
+
+class LazySearcher:
+    """最初の検索まで、DB への接続と埋め込みモデルの読み込みを遅らせる。
+
+    財務数値・比率・ページの取得は、DB もモデルも要らない。検索の準備に失敗しても
+    サーバーは起動し、他のツールは使える。失敗は次の呼び出しでもう一度試す。
+    """
+
+    def __init__(self, factory: Callable[[], Searcher]) -> None:
+        self._factory = factory
+        self._searcher: Searcher | None = None
+        self._lock = threading.Lock()
+
+    def _get(self) -> Searcher:
+        with self._lock:
+            if self._searcher is None:
+                try:
+                    self._searcher = self._factory()
+                except (OSError, psycopg.Error) as e:
+                    raise EdinetMcpError(
+                        "検索を使えません（PostgreSQL に接続できないか、モデルを読み込めません）。"
+                        f"docker compose up -d --wait で DB を起動してください: {type(e).__name__}"
+                    ) from e
+            return self._searcher
+
+    def search(self, query: str, k: int, *, doc_ids: Sequence[str] | None = None) -> list[Hit]:
+        return self._get().search(query, k, doc_ids=doc_ids)
+
+    def is_indexed(self, doc_id: str) -> bool:
+        return self._get().is_indexed(doc_id)
+
 
 DEFAULT_MODEL = "ruri-v3-30m"  # L2 評価で、BM25 との融合の MRR が最も高かった（docs/decisions.md）
 
@@ -22,10 +58,13 @@ def build_service(
 ) -> EdinetService:
     edinet_dir = data_dir / "edinet"
     text_cache = data_dir / "pdf_text"
-    store = ChunkStore.connect(database_url or DatabaseSettings().database_url)
-    retriever = Retriever(store, SentenceTransformerEmbedder(MODELS[model]))
+
+    def make_retriever() -> Retriever:
+        store = ChunkStore.connect(database_url or DatabaseSettings().database_url)
+        return Retriever(store, SentenceTransformerEmbedder(MODELS[model]))
+
     return EdinetService(
-        searcher=retriever,
+        searcher=LazySearcher(make_retriever),
         companies=[c for name in datasets for c in load_dataset(name)],
         load_facts=lambda doc_id: read_facts(edinet_dir / doc_id / f"{doc_id}.csv.zip"),
         load_pages=lambda doc_id: cached_pages(edinet_dir / doc_id / f"{doc_id}.pdf", text_cache),

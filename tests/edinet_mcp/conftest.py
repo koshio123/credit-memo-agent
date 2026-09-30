@@ -60,8 +60,12 @@ PAGES = ["表紙", "3 【事業等のリスク】\n原材料価格が高騰す�
 class FakeSearcher:
     """検索の代わり。渡された引数を記録し、決まったヒットを返す。"""
 
-    def __init__(self) -> None:
+    def __init__(self, indexed: bool = True) -> None:
         self.calls: list[dict[str, object]] = []
+        self.indexed = indexed
+
+    def is_indexed(self, doc_id: str) -> bool:
+        return self.indexed
 
     def search(
         self, query: str, k: int, mode: str = "hybrid_bm25", doc_ids: Sequence[str] | None = None

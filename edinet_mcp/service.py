@@ -5,6 +5,7 @@
 """
 
 import unicodedata
+import zipfile
 from collections.abc import Callable, Sequence
 from typing import Protocol
 
@@ -19,6 +20,7 @@ from edinet_mcp.models import (
 from evals.companies import Company
 from finance.ratios import compute_ratios
 from ingest.xbrl_facts import (
+    Extraction,
     Fact,
     NoConsolidatedStatements,
     UnsupportedAccountingStandard,
@@ -39,6 +41,10 @@ class EdinetMcpError(Exception):
 
 class Searcher(Protocol):
     def search(self, query: str, k: int, *, doc_ids: Sequence[str] | None = None) -> list[Hit]: ...
+
+    def is_indexed(self, doc_id: str) -> bool:
+        """書類が検索の索引に入っているか。入っていないのに空の結果を返すと、記載なしと誤解される。"""
+        ...
 
 
 class EdinetService:
@@ -69,7 +75,7 @@ class EdinetService:
         ]
 
     def _company(self, sec_code: str) -> Company:
-        code = unicodedata.normalize("NFKC", sec_code).strip()
+        code = unicodedata.normalize("NFKC", sec_code).strip().upper()  # 英字入りの証券コードもある
         if len(code) == 5 and code.endswith("0"):  # 証券コードの5桁表記（末尾0）
             code = code[:4]
         company = self._companies.get(code)
@@ -88,6 +94,11 @@ class EdinetService:
             raise EdinetMcpError("クエリが空です")
         company = self._company(sec_code)
         filing = company.filings.current
+        if not self._searcher.is_indexed(filing.doc_id):
+            raise EdinetMcpError(
+                f"書類 {filing.doc_id} は検索の索引に入っていません（取り込みが必要）。"
+                "空の結果と区別するため、エラーにしています"
+            )
         hits = self._searcher.search(query, k, doc_ids=[filing.doc_id])
         return [
             Passage(
@@ -114,6 +125,11 @@ class EdinetService:
             raise EdinetMcpError(
                 f"書類 {doc_id} の財務データ（XBRL の CSV）がありません。先に取得してください"
             ) from e
+        except (zipfile.BadZipFile, UnicodeError) as e:
+            raise EdinetMcpError(
+                f"書類 {doc_id} の財務データ（XBRL の CSV）を読めません: {type(e).__name__}。"
+                "取得し直してください"
+            ) from e
 
     def get_financials(self, sec_code: str, period: Period = "current") -> FinancialsResult:
         if period not in ("current", "previous"):
@@ -121,7 +137,7 @@ class EdinetService:
         company = self._company(sec_code)
         # 前期の値も、当期の書類の前期の列から読む
         doc_id = company.filings.current.doc_id
-        extraction = self._extract(doc_id, period)
+        extraction = self._extract(doc_id, self._facts(doc_id), period)
         filing = company.filings.current if period == "current" else company.filings.previous
         return FinancialsResult(
             sec_code=company.sec_code,
@@ -135,8 +151,8 @@ class EdinetService:
             provenance=extraction.provenance,
         )
 
-    def _extract(self, doc_id: str, period: Period):
-        facts = self._facts(doc_id)
+    @staticmethod
+    def _extract(doc_id: str, facts: list[Fact], period: Period) -> Extraction:
         try:
             return extract(facts, period)
         except UnsupportedAccountingStandard as e:
@@ -149,8 +165,9 @@ class EdinetService:
     def get_ratios(self, sec_code: str) -> RatiosResult:
         company = self._company(sec_code)
         doc_id = company.filings.current.doc_id
-        current = self._extract(doc_id, "current").financials
-        previous = self._extract(doc_id, "previous").financials
+        facts = self._facts(doc_id)  # 1回だけ読む（zip の展開と CSV の解析が重い）
+        current = self._extract(doc_id, facts, "current").financials
+        previous = self._extract(doc_id, facts, "previous").financials
         return RatiosResult(
             sec_code=company.sec_code,
             company=company.name,
@@ -170,6 +187,12 @@ class EdinetService:
             pages = self._load_pages(doc_id)
         except FileNotFoundError as e:
             raise EdinetMcpError(f"書類 {doc_id} の PDF がありません。先に取得してください") from e
+        except Exception as e:  # PDF の解析器は様々な例外を出す。ファイルの読み込みの境界で受ける
+            raise EdinetMcpError(
+                f"書類 {doc_id} の PDF を読めません: {type(e).__name__}。取得し直してください"
+            ) from e
+        if not pages:
+            raise EdinetMcpError(f"書類 {doc_id} の PDF の本文を読めません（ページが0件）")
         if not 1 <= page <= len(pages):
             raise EdinetMcpError(f"ページは 1 から {len(pages)} までです（{page}）")
         return PageResult(

@@ -78,3 +78,18 @@ async def test_知らない証券コードも_エラーで返る(client: Client)
     async with client:
         result = await client.call_tool("get_ratios", {"sec_code": "1234"})
     assert result.is_error
+
+
+async def test_並行して呼んでも_結果が揃う(client: Client) -> None:
+    import anyio
+
+    results: list[bool] = []
+
+    async def call() -> None:
+        r = await client.call_tool("search_filings", {"query": "原材料", "sec_code": "9999"})
+        results.append(not r.is_error)
+
+    async with client, anyio.create_task_group() as tg:
+        for _ in range(8):
+            tg.start_soon(call)
+    assert results == [True] * 8

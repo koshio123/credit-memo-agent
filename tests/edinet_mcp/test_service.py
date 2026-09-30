@@ -1,5 +1,6 @@
 """edinet_mcp のサービス層のテスト。検索・XBRL・PDF の読み込みは差し替えた関数で行う。"""
 
+from collections.abc import Callable
 from decimal import Decimal
 
 import pytest
@@ -151,3 +152,58 @@ def test_ファクトはモジュール定数のまま(service: EdinetService) -
     before = list(FACTS)
     service.get_financials("9999")
     assert before == FACTS
+
+
+# ---- コードレビューでの指摘 ----
+
+
+def _svc(
+    searcher: FakeSearcher | None = None,
+    load_facts: Callable[[str], list[Fact]] = lambda _doc: FACTS,
+    load_pages: Callable[[str], list[str]] = lambda _doc: PAGES,
+) -> EdinetService:
+    return EdinetService(
+        searcher=searcher or FakeSearcher(),
+        companies=[company(), company("130A", "英字入り", "S100ALP0")],
+        load_facts=load_facts,
+        load_pages=load_pages,
+    )
+
+
+def test_索引に入っていない書類の検索は_空の結果ではなくエラーにする() -> None:
+    # 空の結果だと、エージェントが「該当する記載なし」と誤解する
+    svc = _svc(searcher=FakeSearcher(indexed=False))
+    with pytest.raises(EdinetMcpError, match="索引"):
+        svc.search_filings("原材料", "9999")
+
+
+def test_財務比率は_XBRLを1回だけ読む() -> None:
+    calls: list[str] = []
+
+    def load(doc_id: str) -> list[Fact]:
+        calls.append(doc_id)
+        return FACTS
+
+    _svc(load_facts=load).get_ratios("9999")
+    assert calls == [CUR_DOC]
+
+
+def test_証券コードの英字は_大文字小文字を区別しない() -> None:
+    svc = _svc()
+    assert svc.get_page("130a", 1).sec_code == "130A"
+    assert svc.get_page("130a0", 1).sec_code == "130A"  # 5桁表記
+
+
+def test_壊れたXBRLのzipは_理由の分かるエラーにする() -> None:
+    import zipfile
+
+    def broken(_doc: str) -> list[Fact]:
+        raise zipfile.BadZipFile("File is not a zip file")
+
+    with pytest.raises(EdinetMcpError, match="読めません"):
+        _svc(load_facts=broken).get_financials("9999")
+
+
+def test_読めないPDFは_ページ数0ではなく_読めないと伝える() -> None:
+    with pytest.raises(EdinetMcpError, match="読めません"):
+        _svc(load_pages=lambda _doc: []).get_page("9999", 1)

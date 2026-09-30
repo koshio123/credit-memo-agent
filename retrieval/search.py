@@ -4,8 +4,10 @@
 検索の前に、クエリを NFKC で正規化する（本文が NFKC で正規化されているため）。
 """
 
+import threading
 import unicodedata
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Literal
 
 from retrieval.bm25 import Bm25Index
@@ -22,46 +24,59 @@ Mode = Literal["lexical", "bm25", "vector", "hybrid", "hybrid_bm25"]
 _CANDIDATES = 50
 
 
+@dataclass(frozen=True)
+class _Snapshot:
+    index: Bm25Index
+    chunks: dict[str, Chunk]
+    by_doc: dict[str, list[str]]
+    fingerprint: tuple[int, int]
+
+
 class LexicalIndex:
     """全文書のチャンクから作る BM25 の索引（IDF は全文書で計算）。
 
-    取り込みでチャンクが変わったら作り直す。複数の Retriever で共有できる。
+    取り込みでチャンクが変わったら作り直す。複数の Retriever・スレッドで共有できる
+    （作り直しは1つのスナップショットの入れ替えで行い、読み手は途中の状態を見ない）。
     """
 
     def __init__(self, store: ChunkStore) -> None:
         self._store = store
-        self._index: Bm25Index | None = None
-        self._chunks: dict[str, Chunk] = {}
-        self._by_doc: dict[str, list[str]] = {}
-        self._fingerprint: tuple[int, int] | None = None
+        self._snapshot: _Snapshot | None = None
+        self._lock = threading.Lock()
 
     @property
     def index(self) -> Bm25Index:
-        return self._refresh()
+        return self._current().index
 
     def search(self, query: str, k: int, doc_ids: Sequence[str] | None) -> list[Hit]:
-        index = self.index
+        snap = self._current()
         restrict = None
         if doc_ids is not None:
-            restrict = [cid for doc_id in set(doc_ids) for cid in self._by_doc.get(doc_id, [])]
-        ranked = index.search(query, k, restrict)
+            restrict = [cid for doc_id in set(doc_ids) for cid in snap.by_doc.get(doc_id, [])]
+        ranked = snap.index.search(query, k, restrict)
         return [
-            Hit(self._chunks[chunk_id], score, rank)
+            Hit(snap.chunks[chunk_id], score, rank)
             for rank, (chunk_id, score) in enumerate(ranked, start=1)
         ]
 
-    def _refresh(self) -> Bm25Index:
-        fingerprint = self._store.corpus_fingerprint()
-        if self._index is not None and fingerprint == self._fingerprint:
-            return self._index
-        chunks = self._store.all_chunks()
-        self._chunks = {c.chunk_id: c for c in chunks}
-        self._by_doc = {}
-        for c in chunks:
-            self._by_doc.setdefault(c.doc_id, []).append(c.chunk_id)
-        self._index = Bm25Index({c.chunk_id: c.text for c in chunks})
-        self._fingerprint = fingerprint
-        return self._index
+    def _current(self) -> _Snapshot:
+        with self._lock:
+            fingerprint = self._store.corpus_fingerprint()
+            snap = self._snapshot
+            if snap is not None and snap.fingerprint == fingerprint:
+                return snap
+            chunks = self._store.all_chunks()
+            by_doc: dict[str, list[str]] = {}
+            for c in chunks:
+                by_doc.setdefault(c.doc_id, []).append(c.chunk_id)
+            snap = _Snapshot(
+                index=Bm25Index({c.chunk_id: c.text for c in chunks}),
+                chunks={c.chunk_id: c for c in chunks},
+                by_doc=by_doc,
+                fingerprint=fingerprint,
+            )
+            self._snapshot = snap
+            return snap
 
 
 class Retriever:
@@ -103,6 +118,10 @@ class Retriever:
                 for rank, (chunk_id, score) in enumerate(fused[:k], start=1)
             ]
         raise ValueError(f"知らない検索モードです: {mode}")
+
+    def is_indexed(self, doc_id: str) -> bool:
+        """この書類を、このインスタンスの埋め込みモデルで検索できるか（埋め込みが保存されているか）。"""
+        return self._store.count_embeddings(self._embedder.key, doc_id) > 0
 
     def _vector(self, query: str, k: int, doc_ids: Sequence[str] | None) -> list[Hit]:
         (vector,) = self._embedder.embed_queries([query])

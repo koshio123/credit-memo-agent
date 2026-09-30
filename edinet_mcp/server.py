@@ -28,6 +28,9 @@ SecCode = Annotated[str, Field(description="証券コード（4桁。例: 6744�
 
 
 def build_server(service: EdinetService) -> MCPServer:
+    # ツールは async def にして、イベントループの上で1つずつ実行する（同期の関数はスレッドで
+    # 並行に走る）。サービスは1つの DB 接続・埋め込みモデル・BM25 の索引を共有しているため。
+    # 1回の処理は短い（数十ミリ秒〜1秒）ので、直列でよい
     server = MCPServer("edinet-mcp", instructions=INSTRUCTIONS)
 
     def guarded[T](call: Callable[[], T]) -> T:
@@ -38,12 +41,12 @@ def build_server(service: EdinetService) -> MCPServer:
             raise ToolError(str(e)) from e
 
     @server.tool()
-    def list_companies() -> list[CompanyInfo]:
+    async def list_companies() -> list[CompanyInfo]:
         """調べられる会社の一覧（証券コード・会社名・業種・当期の書類ID）。最初に呼んで対象を確かめる。"""
         return service.list_companies()
 
     @server.tool()
-    def search_filings(
+    async def search_filings(
         query: Annotated[
             str, Field(description="知りたい内容を文章で（例: 原材料価格の高騰の影響）")
         ],
@@ -58,7 +61,7 @@ def build_server(service: EdinetService) -> MCPServer:
         return guarded(lambda: service.search_filings(query, sec_code, k))
 
     @server.tool()
-    def get_financials(
+    async def get_financials(
         sec_code: SecCode,
         period: Annotated[
             Period, Field(description="current（当期）か previous（前期）")
@@ -71,7 +74,7 @@ def build_server(service: EdinetService) -> MCPServer:
         return guarded(lambda: service.get_financials(sec_code, period))
 
     @server.tool()
-    def get_ratios(sec_code: SecCode) -> RatiosResult:
+    async def get_ratios(sec_code: SecCode) -> RatiosResult:
         """架空の融資内規に基づく財務比率と水準（標準・留意・要精査）を計算して返す。
 
         自己資本比率・流動比率・営業利益率・インタレスト・カバレッジ・債務償還年数・売上高成長率と、
@@ -81,7 +84,7 @@ def build_server(service: EdinetService) -> MCPServer:
         return guarded(lambda: service.get_ratios(sec_code))
 
     @server.tool()
-    def get_page(
+    async def get_page(
         sec_code: SecCode,
         page: Annotated[int, Field(description="ページ番号（1始まり）")],
     ) -> PageResult:
