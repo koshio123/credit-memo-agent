@@ -145,7 +145,7 @@ credit-memo-agent/
 - [ ] EDINET API キーを取得し、対象企業10社を選ぶ（製造・小売・サービス・建設・不動産などに分散させる）
 - [ ] Ollama を導入し、候補モデル（テキスト用・VLM用）を落として日本語の簡単な動作を確認する
 - [ ] Claude Agent SDK を Pro ログインで動かし、`edinet-mcp` のスタブを接続できるか確認する
-- [ ] リポジトリの骨格と Docker Compose（PostgreSQL + pgvector + pg_bigm）を作る
-- [ ] `llm/` のバックエンド抽象と応答キャッシュを作る
-- [ ] 与信メモのテンプレートと架空融資内規の初版を書く
-- [ ] `docs/decisions.md` を作り、ここまでの決定事項を記録する
+- [x] リポジトリの骨格と Docker Compose（PostgreSQL + pgvector + pg_bigm）を作る
+- [x] `llm/` のバックエンド抽象と応答キャッシュを作る
+- [x] 与信メモのテンプレートと架空融資内規の初版を書く
+- [x] `docs/decisions.md` を作り、ここまでの決定事項を記録する
