@@ -89,7 +89,7 @@ brew install ollama          # 0.35.0
 - **`.git/info/exclude`**: 公開しない個人メモ 1 ファイルを追跡対象から外す一行（ファイル名はそちらを参照）。`.gitignore` に書くと公開リポジトリにファイル名が残るので、こちらに書いた。クローンしても引き継がれない。
 - **`data/`**（gitignore）: `data/edinet/`（取得した有価証券報告書 20 書類の PDF・XBRL・CSV、約 52MB。`uv run python -m scripts.fetch_filings`）と、`data/ground_truth/`（XBRL から作った正解データ。`uv run python -m scripts.build_ground_truth`）。EDINET 由来なので公開しない。
 - **`.env`**: `.env.example` からコピーして作成済み。`LOCAL_MODEL_STANDARD/STRONG` は 8B に向け、`EDINET_API_KEY` を設定した。git の追跡対象外（`.gitignore`）。キーを表示させないため、編集後は読まない。
-- **リモート**: `origin` は `https://github.com/koshio123/credit-memo-agent.git`（**公開**）。2026-09-30 に作成され、先頭の 2 コミット（応募先の文言を消して作り直した後の履歴）がプッシュされ、その時点の GitHub Actions は成功した。以降のコミットは、この記録の後にプッシュした。
+- **リモート**: `origin` は `https://github.com/koshio123/credit-memo-agent.git`（**公開**）。2026-09-30 に作成され、先頭の 2 コミット（履歴を作り直した後のもの）がプッシュされ、その時点の GitHub Actions は成功した。以降のコミットは、この記録の後にプッシュした。
 
 ## 4. リポジトリに入れたファイル（コミットされる）
 
