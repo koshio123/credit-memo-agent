@@ -407,3 +407,20 @@ def test_NaNやInfinityは数値として読まない(tmp_path: Path, raw: str) 
         ],
     )
     assert read_facts(z) == []
+
+
+@pytest.mark.parametrize(
+    ("element", "field"),
+    [
+        ("Inventories", "inventories"),
+        ("NotesAndAccountsReceivableTradeAndContractAssets", "trade_receivables"),
+        ("NotesAndAccountsReceivableTrade", "trade_receivables"),
+        ("NotesAndAccountsPayableTrade", "trade_payables"),
+        ("NotesPayableAccountsPayableForConstructionContractsAndOtherCNS", "trade_payables"),
+    ],
+)
+def test_合計の行が単独で_ハイフン_なら_該当なしの0であって不明ではない(
+    element: str, field: str
+) -> None:
+    fin = _cur(F(element, "－")).financials
+    assert getattr(fin, field) == D(0)

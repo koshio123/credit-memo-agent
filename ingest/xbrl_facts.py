@@ -158,6 +158,9 @@ def _receivables(index: dict[str, Fact]) -> tuple[Decimal | None, list[str]]:
             "AccountsReceivableTrade",
             _ELECTRONIC_RECEIVABLES,
             "ContractAssets",
+            # ここに来るのは、合計の行が無いか「－」の場合。「－」の合計の行だけなら 0 になる
+            "NotesAndAccountsReceivableTradeAndContractAssets",
+            "NotesAndAccountsReceivableTrade",
         ],
     )
 
@@ -176,6 +179,7 @@ def _inventories(index: dict[str, Fact]) -> tuple[Decimal | None, list[str]]:
             "CostsOnUncompletedConstructionContractsCNS",
             "RealEstateForSale",
             "RealEstateForSaleInProcess",
+            "Inventories",  # 合計の行が「－」ならここで 0 になる（値があれば上で返している）
         ],
     )
 
@@ -192,7 +196,17 @@ def _payables(index: dict[str, Fact]) -> tuple[Decimal | None, list[str]]:
                 _ELECTRONIC_PAYABLES,
             ],
         )
-    return _sum(index, ["NotesPayableTrade", "AccountsPayableTrade", _ELECTRONIC_PAYABLES])
+    return _sum(
+        index,
+        [
+            "NotesPayableTrade",
+            "AccountsPayableTrade",
+            _ELECTRONIC_PAYABLES,
+            # 合計の行が「－」の場合に 0 になる（値があれば上で返している）
+            "NotesAndAccountsPayableTrade",
+            "NotesPayableAccountsPayableForConstructionContractsAndOtherCNS",
+        ],
+    )
 
 
 # 項目 -> 項目名の候補（先に書いたものを優先。合成項目は別の関数）
