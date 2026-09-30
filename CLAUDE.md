@@ -6,6 +6,7 @@ EDINETの有価証券報告書から、出典付きの与信メモ草案を生�
 
 ```bash
 uv sync                          # 依存のインストール
+docker compose up -d --wait      # PostgreSQL（pgvector + pg_bigm）を起動
 uv run pytest                    # テスト（LLMを呼ぶものは含まない）
 uv run ruff check . && uv run ruff format --check .
 uv run pyright                   # 型チェック（strict）
