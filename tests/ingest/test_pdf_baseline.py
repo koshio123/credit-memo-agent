@@ -172,7 +172,8 @@ def test_連結財務諸表の範囲を見出しで特定する() -> None:
     sections = find_sections(PAGES)
     assert sections["BS"] == [1, 2]  # 貸借対照表は2ページにわたる
     assert sections["PL"] == [3, 4] or sections["PL"] == [3]
-    assert sections["CF"] == [5]  # 注記事項のページは含めない
+    # 注記の見出しがあるページまでを範囲とする（そのページの見出し以降は、抽出のときに切り捨てる）
+    assert sections["CF"] == [5, 6]
 
 
 def test_本文中の言及や目次は範囲に含めない() -> None:
@@ -411,3 +412,52 @@ def test_壊れた_空の_版の違うキャッシュは使わない(tmp_path: P
 def test_ページが0件の抽出結果はキャッシュしない(tmp_path: Path) -> None:
     cached_pages(_pdf(tmp_path), tmp_path / "cache", reader=lambda _: [])
     assert not list((tmp_path / "cache").glob("*.json"))
+
+
+# ---- コードレビューでの指摘への対応（2回目） ----
+
+CF_ENDING_WITH_NOTES = """EDINET提出書類
+サンプル株式会社(E00000)
+有価証券報告書
+4【連結キャッシュ・フロー計算書】
+(単位:百万円)
+営業活動によるキャッシュ・フロー
+減価償却費 2,526 2,445
+現金及び現金同等物の期末残高 35,442 43,408
+【注記事項】
+(連結財務諸表作成のための基本となる重要な事項)
+減価償却費 9,999 9,999
+"""
+
+CF_WITHOUT_DEPRECIATION_THEN_NOTES = """EDINET提出書類
+サンプル株式会社(E00000)
+有価証券報告書
+4【連結キャッシュ・フロー計算書】
+(単位:百万円)
+現金及び現金同等物の期末残高 35,442 43,408
+【注記事項】
+減価償却費 9,999 9,999
+"""
+
+
+def test_CFと注記が同じページにあっても_CFの部分は読める() -> None:
+    items = extract_items([BS_PAGE, PL_PAGE, CF_ENDING_WITH_NOTES])
+    assert items["depreciation"].value == D(2_445) * 1_000_000
+
+
+def test_注記の見出し以降の本文は読まない() -> None:
+    # CF にその項目が無いとき、注記に出る同名の行を拾ってはいけない
+    items = extract_items([BS_PAGE, PL_PAGE, CF_WITHOUT_DEPRECIATION_THEN_NOTES])
+    assert items["depreciation"].value is None
+    assert items["depreciation"].reason == "label_not_found"
+
+
+def test_前連結会計年度は_列の見出しの行だけを2列の根拠にする() -> None:
+    # 初回の有報のように1列の表。注記の文中に「前連結会計年度」があっても、2列とはみなさない
+    bs = SINGLE_COLUMN_BS.replace(
+        "資産合計 181,811", "資産合計 181,811\n前連結会計年度において減損損失を計上しました。"
+    )
+    assert (
+        extract_items([bs, SINGLE_COLUMN_PL, CF_PAGE])["total_assets"].value
+        == D(181_811) * 1_000_000
+    )

@@ -178,9 +178,9 @@ def find_sections(pages: list[str]) -> dict[str, list[int]]:
     if cf is not None:
         cf_pages: list[int] = []
         for i in range(cf, min(cf + _CF_MAX_PAGES, len(pages))):
-            if _NOTES_RE.search(pages[i]):
-                break
             cf_pages.append(i)
+            if _NOTES_RE.search(pages[i]):
+                break  # このページで注記が始まる。見出し以降は抽出のときに切り捨てる
         sections["CF"] = cf_pages
     return sections
 
@@ -211,6 +211,15 @@ def _is_pure_loss_label(label: str) -> bool:
     return "損失" in label and "利益" not in label and "△" not in label
 
 
+_PRIOR_COLUMN_HEADER = re.compile(r"^前連結会計年度\s*当連結会計年度", re.MULTILINE)
+
+
+def _before_notes(page: str) -> str:
+    """注記の見出しより前の本文。CF と注記が同じページにあっても、注記の同名の行を読まない。"""
+    match = _NOTES_RE.search(page)
+    return page[: match.start()] if match else page
+
+
 def _page_unit(page: str, carried: int | None) -> int | None:
     return unit_of(page) or carried
 
@@ -235,10 +244,11 @@ def extract_items(pages: list[str]) -> dict[str, ExtractedValue]:
             result[name] = ExtractedValue(None, reason="unit_not_found")
             continue
 
-        # 前期の列を持つ表（「前連結会計年度」の見出しがある）では、数値が1つの行は列の対応が
-        # 分からないので読まない。1列だけの表（初回の有報など）では読む。継続ページには見出しが
-        # 無いので、ページではなく節全体で判定する
-        two_columns = any("前連結会計年度" in pages[i] for i in page_indexes)
+        # 「前連結会計年度 当連結会計年度」の見出しの行がある表は2列。数値が1つの行は、列の対応が
+        # 分からないので読まない。見出しの無い1列の表（初回の有報など）では読む。継続ページには
+        # 見出しが無いので、ページではなく節全体で判定する。文中の言及は根拠にしない
+        bodies = {i: _before_notes(pages[i]) if section == "CF" else pages[i] for i in page_indexes}
+        two_columns = any(_PRIOR_COLUMN_HEADER.search(bodies[i]) for i in page_indexes)
 
         found: ExtractedValue | None = None
         for pattern in patterns:
@@ -247,7 +257,7 @@ def extract_items(pages: list[str]) -> dict[str, ExtractedValue]:
                 unit = units[i]
                 if unit is None:
                     continue
-                for row in _rows(pages[i]):
+                for row in _rows(bodies[i]):
                     if two_columns and len(row.values) < 2:
                         continue
                     label = next((lb for lb in row.labels if regex.search(lb)), None)
