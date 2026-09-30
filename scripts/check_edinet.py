@@ -10,8 +10,8 @@ import logging
 import sys
 
 import httpx
-from pydantic import SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from ingest.settings import EdinetSettings
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 # httpx / httpcore は INFO で「リクエストのURL」を出す。EDINET はキーをURLのクエリで渡すので、
@@ -22,12 +22,6 @@ log = logging.getLogger("check_edinet")
 
 DOCUMENTS_URL = "https://api.edinet-fsa.go.jp/api/v2/documents.json"
 DEFAULT_DATE = "2026-09-29"
-
-
-class EdinetSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-
-    edinet_api_key: SecretStr = SecretStr("")
 
 
 def run(key: str, date: str, client: httpx.Client) -> int:
