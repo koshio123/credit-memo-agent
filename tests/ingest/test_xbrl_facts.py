@@ -6,7 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from ingest.xbrl_facts import Fact, UnsupportedAccountingStandard, extract, read_facts
+from ingest.xbrl_facts import (
+    Fact,
+    NoConsolidatedStatements,
+    UnsupportedAccountingStandard,
+    extract,
+    read_facts,
+)
 
 D = Decimal
 
@@ -338,3 +344,66 @@ def test_CSVのzipを読む(tmp_path: Path) -> None:
     assert facts[("ShortTermLoansPayable", "連結")].nil is True
     assert facts[("NetAssets", "連結")].value == D(-50)
     assert ("Remarks", "その他") not in facts  # 数値でない行は読まない
+
+
+# ---- コードレビューでの指摘への対応 ----
+
+
+def test_有利子負債_固定負債の新株予約権付社債も社債に含める() -> None:
+    fin = _cur(F("BondsPayable", 100), F("BondsWithSubscriptionRightsToShares", 40)).financials
+    assert fin.bonds == D(140)
+
+
+def test_先頭の候補が_ハイフン_なら_値のある後ろの候補を使う_売上高() -> None:
+    fin = _cur(
+        F("NetSales", "－", "CurrentYearDuration"),
+        F("OperatingRevenue1", 500, "CurrentYearDuration"),
+    ).financials
+    assert fin.net_sales == D(500)
+
+
+def test_候補がすべてハイフンなら0() -> None:
+    assert _cur(F("NetSales", "－", "CurrentYearDuration")).financials.net_sales == D(0)
+
+
+def test_棚卸資産の合計の行がハイフンなら_値のある内訳を使う() -> None:
+    fin = _cur(F("Inventories", "－"), F("MerchandiseAndFinishedGoods", 300)).financials
+    assert fin.inventories == D(300)
+
+
+def test_売上債権の合計の行がハイフンなら_値のある内訳を使う() -> None:
+    fin = _cur(
+        F("NotesAndAccountsReceivableTradeAndContractAssets", "－"),
+        F("NotesReceivableTrade", 10),
+        F("AccountsReceivableTrade", 90),
+    ).financials
+    assert fin.trade_receivables == D(100)
+
+
+def test_連結の財務諸表が1行も無い書類は_黙って空にせず失敗する() -> None:
+    # 個別しか無い、または形式を読めない書類。すべて None の結果を返さない
+    with pytest.raises(NoConsolidatedStatements):
+        extract([F("Assets", 100, consolidated="個別")], "current")
+    with pytest.raises(NoConsolidatedStatements):
+        extract([], "current")
+
+
+@pytest.mark.parametrize("raw", ["NaN", "Infinity", "-Infinity", "sNaN"])
+def test_NaNやInfinityは数値として読まない(tmp_path: Path, raw: str) -> None:
+    z = _zip_with_csv(
+        tmp_path / "x.zip",
+        [
+            [
+                "jppfs_cor:Assets",
+                "資産",
+                "CurrentYearInstant",
+                "当期末",
+                "連結",
+                "時点",
+                "JPY",
+                "円",
+                raw,
+            ]
+        ],
+    )
+    assert read_facts(z) == []

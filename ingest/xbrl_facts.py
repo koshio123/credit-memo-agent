@@ -36,6 +36,13 @@ class UnsupportedAccountingStandard(Exception):
     """J-GAAP の連結財務諸表を読めない書類（IFRS など）。"""
 
 
+class NoConsolidatedStatements(Exception):
+    """連結の財務諸表の行が1つも無い書類（個別のみ、または形式を読めない）。
+
+    すべて None の結果を黙って返さないために、失敗させる。
+    """
+
+
 @dataclass(frozen=True)
 class Fact:
     element: str  # 名前空間を除いた項目名
@@ -77,6 +84,8 @@ def read_facts(csv_zip: Path) -> list[Fact]:
                     value = Decimal(raw)
                 except InvalidOperation:
                     continue  # 文章など、数値でない行
+                if not value.is_finite():
+                    continue  # "NaN" や "Infinity" は Decimal が受け付けるが、金額ではない
                 facts.append(Fact(element, row[2], row[4], value, nil=False, namespace=namespace))
     return facts
 
@@ -84,9 +93,13 @@ def read_facts(csv_zip: Path) -> list[Fact]:
 def _index(facts: list[Fact], period: Period) -> dict[str, Fact]:
     contexts = _CONTEXTS[period]
     jgaap = [f for f in facts if f.namespace == "jppfs_cor" and f.consolidated == "連結"]
-    if not jgaap and any(f.namespace == "jpigp_cor" for f in facts):
-        raise UnsupportedAccountingStandard(
-            "連結財務諸表が IFRS（jpigp_cor）の書類です。J-GAAP の項目では読めません"
+    if not jgaap:
+        if any(f.namespace == "jpigp_cor" for f in facts):
+            raise UnsupportedAccountingStandard(
+                "連結財務諸表が IFRS（jpigp_cor）の書類です。J-GAAP の項目では読めません"
+            )
+        raise NoConsolidatedStatements(
+            "連結の財務諸表の行が見つかりません（個別のみ、または形式が違う）"
         )
     index: dict[str, Fact] = {}
     for f in jgaap:
@@ -106,10 +119,19 @@ def _sum(index: dict[str, Fact], names: list[str]) -> tuple[Decimal | None, list
     return sum((index[n].value for n in used), Decimal(0)), used
 
 
+def _has(index: dict[str, Fact], name: str) -> bool:
+    """値のある行か。「－」（行はあるが金額なし）は、値のある行とは扱わない。"""
+    return name in index and not index[name].nil
+
+
 def _first(index: dict[str, Fact], names: list[str]) -> tuple[Decimal | None, list[str]]:
+    """値のある最初の候補。値のある候補が無く「－」の行だけがあれば 0、行が無ければ None。"""
+    for n in names:
+        if _has(index, n):
+            return index[n].value, [n]
     for n in names:
         if n in index:
-            return index[n].value, [n]
+            return Decimal(0), [n]
     return None, []
 
 
@@ -119,12 +141,12 @@ _ELECTRONIC_PAYABLES = "ElectronicallyRecordedObligationsOperatingCL"  # 電子�
 
 def _receivables(index: dict[str, Fact]) -> tuple[Decimal | None, list[str]]:
     """売上債権。合計の行があれば内訳は足さず、合計の行に含まれない行だけを足す。"""
-    if "NotesAndAccountsReceivableTradeAndContractAssets" in index:
+    if _has(index, "NotesAndAccountsReceivableTradeAndContractAssets"):
         # 受取手形、売掛金及び契約資産（契約資産を含む）。電子記録債権は別の行
         return _sum(
             index, ["NotesAndAccountsReceivableTradeAndContractAssets", _ELECTRONIC_RECEIVABLES]
         )
-    if "NotesAndAccountsReceivableTrade" in index:
+    if _has(index, "NotesAndAccountsReceivableTrade"):
         # 受取手形及び売掛金（契約資産・電子記録債権を含まない）
         return _sum(
             index, ["NotesAndAccountsReceivableTrade", _ELECTRONIC_RECEIVABLES, "ContractAssets"]
@@ -142,7 +164,7 @@ def _receivables(index: dict[str, Fact]) -> tuple[Decimal | None, list[str]]:
 
 def _inventories(index: dict[str, Fact]) -> tuple[Decimal | None, list[str]]:
     """棚卸資産。合計の行があればそれ、無ければ内訳（不動産の販売用不動産、建設の未成工事支出金を含む）。"""
-    if "Inventories" in index:
+    if _has(index, "Inventories"):
         return index["Inventories"].value, ["Inventories"]
     return _sum(
         index,
@@ -160,9 +182,9 @@ def _inventories(index: dict[str, Fact]) -> tuple[Decimal | None, list[str]]:
 
 def _payables(index: dict[str, Fact]) -> tuple[Decimal | None, list[str]]:
     """仕入債務。電子記録債務（営業）は別の行なので足す。営業外の電子記録債務は含めない。"""
-    if "NotesAndAccountsPayableTrade" in index:
+    if _has(index, "NotesAndAccountsPayableTrade"):
         return _sum(index, ["NotesAndAccountsPayableTrade", _ELECTRONIC_PAYABLES])
-    if "NotesPayableAccountsPayableForConstructionContractsAndOtherCNS" in index:
+    if _has(index, "NotesPayableAccountsPayableForConstructionContractsAndOtherCNS"):
         return _sum(
             index,
             [
@@ -201,7 +223,7 @@ _DEBT: dict[str, list[str]] = {
         "CurrentPortionOfBonds",
         "CurrentPortionOfBondsWithSubscriptionRightsToShares",
     ],
-    "bonds": ["BondsPayable"],
+    "bonds": ["BondsPayable", "BondsWithSubscriptionRightsToShares"],
     "long_term_borrowings": ["LongTermLoansPayable"],
     "lease_obligations": ["LeaseObligationsCL", "LeaseObligationsNCL"],
 }
