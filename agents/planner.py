@@ -26,7 +26,7 @@ DEFAULT_RISK_QUERIES: tuple[str, ...] = (
     "原材料価格 為替 金利の変動 リスク",
     "法規制 訴訟 偶発債務 リスク",
 )
-_MAX_OVERVIEW = 4
+_MAX_OVERVIEW = 5
 _MAX_RISK = 6
 _MAX_QUERY_CHARS = 80
 
@@ -67,7 +67,10 @@ async def make_plan(ctx: Context, company: str, industry: str, summary: str) -> 
         out = await complete_structured(ctx.backend, request, PlanOut)
     except StructuredOutputError:
         return default_plan()
-    overview = _clean(out.overview_queries, _MAX_OVERVIEW) or list(DEFAULT_OVERVIEW_QUERIES)
+    # 概要の必須の問いも、リスクと同様に、Planner の出力にかかわらず入れる（実機で、Planner が
+    # 事業の内容・従業員・株主の問いを外して、概要が空になった）
+    specific_overview = _clean(out.overview_queries, _MAX_OVERVIEW - len(DEFAULT_OVERVIEW_QUERIES))
+    overview = _clean([*specific_overview, *DEFAULT_OVERVIEW_QUERIES], _MAX_OVERVIEW)
     specific = _clean(out.risk_queries, _MAX_RISK - len(MANDATORY_RISK_QUERIES))
     risk = _clean([*specific, *MANDATORY_RISK_QUERIES], _MAX_RISK)
     return Plan(overview, risk)

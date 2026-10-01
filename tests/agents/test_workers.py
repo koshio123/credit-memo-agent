@@ -116,6 +116,9 @@ async def test_Plannerは_問いを決める_必須の問いは必ず含める(s
         ctx(service, backend), company="サンプル工業", industry="機械", summary=""
     )
     assert "主力製品" in plan.overview_queries
+    # 概要の必須の問い（事業の内容・従業員・株主）は、Planner が外しても入る
+    for required in DEFAULT_OVERVIEW_QUERIES:
+        assert required in plan.overview_queries
     assert "為替の影響" in plan.risk_queries
     for required in MANDATORY_RISK_QUERIES:
         assert required in plan.risk_queries
@@ -135,7 +138,7 @@ async def test_Plannerの問いは_数と長さを制限し_重複を除く(serv
         [json.dumps({"overview_queries": many + many, "risk_queries": ["a" * 500, ""]})]
     )
     plan = await make_plan(ctx(service, backend), company="x", industry="y", summary="")
-    assert len(plan.overview_queries) <= 4
+    assert len(plan.overview_queries) <= 5
     assert len(set(plan.overview_queries)) == len(plan.overview_queries)
     assert all(0 < len(q) <= 80 for q in plan.risk_queries)
 

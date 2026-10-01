@@ -40,7 +40,7 @@ class _Refs:
 
 def _claims(claims: Sequence[Claim], refs: _Refs) -> list[str]:
     if not claims:
-        return ["- （該当する記載はありません）"]
+        return ["- （主張を得られなかった。資料に記載がないことを意味しない。検査の記録を参照）"]
     return [f"- {c.text} {refs.of(c.evidence_ids)}".rstrip() for c in claims]
 
 
@@ -170,13 +170,26 @@ def _flag_lines(items: Sequence[Flagged]) -> list[str]:
     ] or ["- なし"]
 
 
+_SECTIONS = (
+    ("overview", "企業概要"),
+    ("financial_findings", "財務の所見"),
+    ("business_risks", "事業リスク"),
+    ("positives", "肯定的な要素"),
+    ("negatives", "否定的な要素"),
+    ("open_items", "確認が必要な事項（LLM が挙げたもの）"),
+)
+
+
 def _inspection(memo: MemoDraft) -> list[str]:
+    empty = [label for key, label in _SECTIONS if not getattr(memo, key)]
     return [
         "## 検査の記録",
         "",
         "このメモに対して、コードで次の検査をした: 出典の有無、出典の存在、数値が出典と合うか、"
         "結論を示す語。**主張が出典の内容に支えられているか（意味）は検証していない**"
         "（検証エージェントは今後実装する）。",
+        "",
+        "主張が1件も得られなかった節: " + ("、".join(empty) if empty else "なし"),
         "",
         "検査で除外した主張（メモの本文には入れていない）:",
         *_flag_lines(memo.rejected),

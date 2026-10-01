@@ -77,6 +77,18 @@ async def test_第13条の検索の記録は_XBRLの財務データとは書か�
     assert "語句検索" in row
 
 
+async def test_主張を得られなかった節は_記載がないとは書かず_検査の記録に載せる(
+    service: EdinetService,
+) -> None:
+    result = await make_result(service, extra={"overview": []})
+    text = render_memo(result)
+    overview = text.partition("## 1.")[2].partition("## 2.")[0]
+    assert "主張を得られなかった" in overview
+    assert "記載がないことを意味しない" in overview
+    record = text.partition("## 検査の記録")[2]
+    assert "主張が1件も得られなかった節" in record and "企業概要" in record
+
+
 async def test_ヘッダーに_企業名_証券コード_期間_草案の注意がある(service: EdinetService) -> None:
     text = render_memo(await make_result(service))
     assert "サンプル工業" in text and "9999" in text
