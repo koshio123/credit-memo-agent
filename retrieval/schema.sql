@@ -1,6 +1,5 @@
 -- 文書・チャンク・埋め込み。CREATE ... IF NOT EXISTS なので、何度実行してもよい。
 CREATE EXTENSION IF NOT EXISTS vector;
-CREATE EXTENSION IF NOT EXISTS pg_bigm;
 
 CREATE TABLE IF NOT EXISTS documents (
     doc_id     text PRIMARY KEY,
@@ -20,8 +19,6 @@ CREATE TABLE IF NOT EXISTS chunks (
     text         text NOT NULL
 );
 CREATE INDEX IF NOT EXISTS chunks_doc_idx ON chunks (doc_id, seq);
--- 日本語の部分一致・類似度検索（2-gram）
-CREATE INDEX IF NOT EXISTS chunks_text_bigm_idx ON chunks USING gin (text gin_bigm_ops);
 
 -- 埋め込みはモデルごとに次元が違うので、次元を固定しない vector にする。
 -- 検索は必ず model で絞り込む。件数が少ない（数千）ので、厳密な全件検索で足りる。

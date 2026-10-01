@@ -33,19 +33,13 @@ def ids(hits: list[Hit]) -> list[str]:
     return [h.chunk.chunk_id for h in hits]
 
 
-def test_全文検索だけ(loaded: tuple[ChunkStore, HashEmbedder]) -> None:
-    store, e = loaded
-    r = Retriever(store, e)
-    assert ids(r.search("原材料価格の高騰が収益に与える影響", k=3, mode="lexical"))[0] == "D1:1"
-
-
 def test_ベクトル検索だけ(loaded: tuple[ChunkStore, HashEmbedder]) -> None:
     store, e = loaded
     r = Retriever(store, e)
     assert ids(r.search("原材料価格の高騰が収益に与える影響", k=3, mode="vector"))[0] == "D1:1"
 
 
-def test_融合は_全文とベクトルの両方で上位のものを上に出す(
+def test_融合は_BM25とベクトルの両方で上位のものを上に出す(
     loaded: tuple[ChunkStore, HashEmbedder],
 ) -> None:
     store, e = loaded
@@ -53,6 +47,13 @@ def test_融合は_全文とベクトルの両方で上位のものを上に出�
     hits = r.search("原材料価格の高騰が収益に与える影響", k=3, mode="hybrid")
     assert ids(hits)[0] == "D1:1"
     assert [h.rank for h in hits] == list(range(1, len(hits) + 1))
+
+
+def test_融合の順位は_1から順に並ぶ(loaded: tuple[ChunkStore, HashEmbedder]) -> None:
+    store, e = loaded
+    hits = Retriever(store, e).search("従業員の平均年齢", k=3, mode="hybrid")
+    assert [h.rank for h in hits] == list(range(1, len(hits) + 1))
+    assert [h.score for h in hits] == sorted((h.score for h in hits), reverse=True)
 
 
 def test_kで件数を絞る(loaded: tuple[ChunkStore, HashEmbedder]) -> None:
@@ -70,8 +71,8 @@ def test_クエリは全角半角をそろえてから検索する(loaded: tuple
     # 本文は NFKC で正規化されている。全角の数字・英字を含むクエリでも同じ結果になる
     store, e = loaded
     r = Retriever(store, e)
-    assert ids(r.search("配当性向は３０％", k=3, mode="lexical")) == ids(
-        r.search("配当性向は30%", k=3, mode="lexical")
+    assert ids(r.search("配当性向は３０％", k=3, mode="bm25")) == ids(
+        r.search("配当性向は30%", k=3, mode="bm25")
     )
 
 
@@ -103,13 +104,6 @@ def test_BM25の統計は_絞り込みに関係なく全文書のもの(store: C
     assert only_a[0].score == both[0].score
 
 
-def test_BM25と融合しても_上位は変わらない(loaded: tuple[ChunkStore, HashEmbedder]) -> None:
-    store, e = loaded
-    hits = Retriever(store, e).search("原材料価格の高騰が収益に与える影響", k=3, mode="hybrid_bm25")
-    assert ids(hits)[0] == "D1:1"
-    assert [h.rank for h in hits] == list(range(1, len(hits) + 1))
-
-
 def test_索引を作った後に取り込んだ文書も_検索できる(store: ChunkStore) -> None:
     e = HashEmbedder(dim=64)
     r = Retriever(store, e)
@@ -127,7 +121,7 @@ def test_モードを省略すると_評価で最良だったBM25とベクトル
     store, e = loaded
     r = Retriever(store, e)
     q = "原材料価格の高騰が収益に与える影響"
-    assert ids(r.search(q, k=3)) == ids(r.search(q, k=3, mode="hybrid_bm25"))
+    assert ids(r.search(q, k=3)) == ids(r.search(q, k=3, mode="hybrid"))
 
 
 def test_語句側の索引は_複数のRetrieverで共有できる(

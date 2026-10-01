@@ -26,7 +26,7 @@ REPORT = Path("evals/reports/l2_retrieval.md")
 LABELS = {
     "dev": "開発用",
     "heldout": (
-        "保留データ（全文の方式を BM25 に替えるときに、pg_bigm の結果を見た。"
+        "保留データ（全文の方式を BM25 に替えるときに、以前の方式（pg_bigm）の結果を見た。"
         "BM25 のパラメータは調整していない）"
     ),
 }
@@ -53,14 +53,11 @@ def run(store: ChunkStore) -> int:
         )
 
     systems: dict[str, Callable[[Question], list[Hit]]] = {
-        "全文（pg_bigm）": system("e5-small", "lexical"),
         "全文（BM25 文字2-gram）": system("e5-small", "bm25"),
         "ベクトル: e5-small": system("e5-small", "vector"),
         "ベクトル: ruri-v3-30m": system("ruri-v3-30m", "vector"),
-        "融合: 全文 + e5-small": system("e5-small", "hybrid"),
-        "融合: 全文 + ruri-v3-30m": system("ruri-v3-30m", "hybrid"),
-        "融合: BM25 + e5-small": system("e5-small", "hybrid_bm25"),
-        "融合: BM25 + ruri-v3-30m": system("ruri-v3-30m", "hybrid_bm25"),
+        "融合: BM25 + e5-small": system("e5-small", "hybrid"),
+        "融合: BM25 + ruri-v3-30m": system("ruri-v3-30m", "hybrid"),
     }
 
     chunks = store.all_chunks()

@@ -1,10 +1,10 @@
-"""PostgreSQL への保存と検索の統合テスト。実際の DB（pgvector と pg_bigm）を使う。"""
+"""PostgreSQL への保存と検索の統合テスト。実際の DB（pgvector）を使う。"""
 
 import pytest
 
 from retrieval.chunker import Chunk
 from retrieval.embedding import HashEmbedder
-from retrieval.store import ChunkStore, DocumentRecord, Hit
+from retrieval.store import ChunkStore, DocumentRecord
 
 pytestmark = pytest.mark.db
 
@@ -48,33 +48,6 @@ def test_同じ文書を保存し直すと_古いチャンクと埋め込みは�
 
     assert [c.text for c in store.get_chunks("A")] == [DIV]
     assert store.count_embeddings("hash", "A") == 0  # 古いチャンクの埋め込みが残らない
-
-
-# ---- 全文検索（pg_bigm の 2-gram 類似度） ----
-
-
-def test_全文検索は_2gramの類似度が高い順に返し_順位は1始まり(store: ChunkStore) -> None:
-    store.upsert_document(DOC_A, [_chunk("A", 0, STAFF), _chunk("A", 1, RISK), _chunk("A", 2, DIV)])
-
-    hits = store.search_lexical("原材料価格の高騰は収益にどう影響するか", k=3)
-
-    assert hits[0].chunk.chunk_id == "A:1"
-    assert [h.rank for h in hits] == list(range(1, len(hits) + 1))
-    assert hits[0].score >= hits[-1].score
-
-
-def test_全文検索は_文書で絞り込める(store: ChunkStore) -> None:
-    store.upsert_document(DOC_A, [_chunk("A", 0, RISK)])
-    store.upsert_document(DOC_B, [_chunk("B", 0, RISK)])
-
-    hits = store.search_lexical("原材料価格の高騰", k=5, doc_ids=["B"])
-
-    assert [h.chunk.doc_id for h in hits] == ["B"]
-
-
-def test_全文検索は_共通の2gramが無いチャンクを返さない(store: ChunkStore) -> None:
-    store.upsert_document(DOC_A, [_chunk("A", 0, "ABCDEFG")])
-    assert store.search_lexical("あいうえお", k=5) == []
 
 
 # ---- ベクトル検索（pgvector のコサイン距離） ----
@@ -122,7 +95,6 @@ def test_埋め込みの数を数えられる(store: ChunkStore) -> None:
     assert store.count_embeddings("hash", "A") == 0
     store.add_embeddings("hash", ["A:0"], e.embed_documents([RISK]))
     assert store.count_embeddings("hash", "A") == 1
-    assert isinstance(store.search_lexical("原材料", k=1)[0], Hit)
 
 
 # ---- 書き込みが確定されること（別の接続から見えるか） ----
@@ -164,8 +136,10 @@ def test_保存した埋め込みも_別の接続から見える(store: ChunkSto
 
 
 def test_検索だけの接続が_書き込みのトランザクションを開いたままにしない(store: ChunkStore) -> None:
+    e = HashEmbedder(dim=8)
     store.upsert_document(DOC_A, [_chunk("A", 0, RISK)])
-    store.search_lexical("原材料", k=1)
+    store.add_embeddings("hash", ["A:0"], e.embed_documents([RISK]))
+    store.search_vector("hash", e.embed_queries(["原材料"])[0], k=1)
     store.get_chunks("A")
 
     # 読み取りの後も、未確定のトランザクションが残っていない
