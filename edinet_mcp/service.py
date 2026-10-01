@@ -4,6 +4,7 @@
 - 比率と水準の判定は finance/ratios.py（架空の融資内規に基づく）。融資の可否は返さない。
 """
 
+import logging
 import unicodedata
 import zipfile
 from collections.abc import Callable, Sequence
@@ -30,6 +31,8 @@ from ingest.xbrl_facts import (
 )
 from retrieval.citations import SourceSpan, SpanNotFoundError, locate_chunk
 from retrieval.store import Hit
+
+logger = logging.getLogger(__name__)
 
 MAX_K = 20
 POLICY_NOTE = (
@@ -65,6 +68,7 @@ class EdinetService:
         self._load_pages = load_pages
         self._pdf_items = pdf_items
         self._pages_cache: dict[str, list[str]] = {}
+        self._pdf_cache: dict[str, dict[str, ExtractedValue]] = {}
 
     # ---- 会社 ----
 
@@ -108,22 +112,30 @@ class EdinetService:
             )
         hits = self._searcher.search(query, k, doc_ids=[filing.doc_id])
         pages = self._pages(filing.doc_id)
-        return [
-            Passage(
-                sec_code=company.sec_code,
-                company=company.name,
-                doc_id=hit.chunk.doc_id,
-                period_end=filing.period_end,
-                page_start=hit.chunk.page_start,
-                page_end=hit.chunk.page_end,
-                heading_path=hit.chunk.heading_path,
-                text=hit.chunk.text,
-                spans=self._spans(hit, pages),
-                rank=hit.rank,
-                score=hit.score,
+        passages: list[Passage] = []
+        for hit in hits:
+            try:
+                spans = self._spans(hit, pages)
+            except EdinetMcpError as e:
+                # 出典スパンを作れない本文は、出典にできないので返さない（他の結果は返す）
+                logger.warning("出典スパンを作れない検索結果を除きました: %s", e)
+                continue
+            passages.append(
+                Passage(
+                    sec_code=company.sec_code,
+                    company=company.name,
+                    doc_id=hit.chunk.doc_id,
+                    period_end=filing.period_end,
+                    page_start=hit.chunk.page_start,
+                    page_end=hit.chunk.page_end,
+                    heading_path=hit.chunk.heading_path,
+                    text=hit.chunk.text,
+                    spans=spans,
+                    rank=hit.rank,
+                    score=hit.score,
+                )
             )
-            for hit in hits
-        ]
+        return passages
 
     @staticmethod
     def _spans(hit: Hit, pages: list[str]) -> list[SourceSpan]:
@@ -188,8 +200,11 @@ class EdinetService:
     def _pdf_pages(self, doc_id: str, financials: PeriodFinancials) -> dict[str, int]:
         """PDF の基準線が、XBRL と同じ値を読んだ項目のページ。読めない・値が違う項目は含めない。"""
         try:
-            items = self._pdf_items(self._pages(doc_id))
-        except Exception:  # ページの付与は補助。失敗しても数値は返す
+            if doc_id not in self._pdf_cache:
+                self._pdf_cache[doc_id] = self._pdf_items(self._pages(doc_id))
+            items = self._pdf_cache[doc_id]
+        except Exception as e:  # ページの付与は補助。失敗しても数値は返す
+            logger.warning("PDF のページを付けられませんでした（%s）: %s", doc_id, e)
             return {}
         found: dict[str, int] = {}
         for name, item in items.items():

@@ -64,6 +64,22 @@ def test_重要な不確実性が存在する旨の記載を検出する() -> No
     assert check_going_concern("D1", [page]).status == "signal_found"
 
 
+def test_否定の言い回しは_記載ありとしない() -> None:
+    for text in (
+        "継続企業の前提に関する重要事象等は存在しておりません。",
+        "継続企業の前提に重要な疑義を生じさせるような事象又は状況は存在しない。",
+        "継続企業の前提に関する重要な不確実性は認められません。",
+        "継続企業の前提に関する重要な不確実性が認められない。",
+        "重要事象等が存在しないため、継続企業の前提に関する注記はありません。",
+    ):
+        assert check_going_concern("D1", [text]).status == "no_signal", text
+
+
+def test_見出しの後の内容は_先頭の空白があっても_該当事項なしと判定する() -> None:
+    page = "継続企業の前提に関する重要事象等\n   該当事項はありません。\n"
+    assert check_going_concern("D1", [page]).status == "no_signal"
+
+
 def test_重要事象等の見出しが_該当事項なし_なら記載なし() -> None:
     page = "継続企業の前提に関する重要事象等\n該当事項はありません。\n"
     assert check_going_concern("D1", [page]).status == "no_signal"

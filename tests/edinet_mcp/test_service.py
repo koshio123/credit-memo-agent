@@ -206,6 +206,31 @@ def test_PDFの読み取りに失敗しても_財務数値は返す() -> None:
     assert _svc(pdf_items=broken).get_financials("9999").pdf_pages == {}
 
 
+def test_スパンを作れない検索結果は_飛ばして_残りを返す(searcher: FakeSearcher) -> None:
+    from retrieval.chunker import Chunk
+    from retrieval.store import Hit
+    from tests.edinet_fakes import build_service
+
+    good = Chunk("D:1", CUR_DOC, ["h"], 2, 2, PAGES[1])
+    bad = Chunk("D:2", CUR_DOC, ["h"], 2, 2, "ページに無い本文")
+    searcher.search = lambda *a, **k: [Hit(bad, 0.9, 1), Hit(good, 0.5, 2)]  # type: ignore[method-assign, assignment]
+    passages = build_service(searcher).search_filings("x", "9999")
+    assert [p.text for p in passages] == [PAGES[1]]
+
+
+def test_PDFの基準線は_書類ごとに1回だけ走らせる() -> None:
+    calls: list[int] = []
+
+    def counting(pages: list[str]) -> dict[str, ExtractedValue]:
+        calls.append(1)
+        return fake_pdf_items(pages)
+
+    svc = _svc(pdf_items=counting)
+    svc.get_financials("9999")
+    svc.get_financials("9999")
+    assert len(calls) == 1
+
+
 # ---- コードレビューでの指摘 ----
 
 

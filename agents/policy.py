@@ -24,12 +24,15 @@ _SIGNALS: tuple[re.Pattern[str], ...] = (
     re.compile(r"疑義を生じさせるような事象又は状況[^。]{0,20}(が存在|が認められ(?!る場合|るか))"),
     re.compile(r"重要な不確実性が(存在|認められ(?!る場合|るか))"),
 )
-# 見出しの直後に内容があれば、記載あり。「該当事項はありません」なら記載なし
-_HEADINGS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"\(継続企業の前提に関する事項\)"),
-    re.compile(r"継続企業の前提に関する重要事象等"),
+# 見出し（その語だけの行）の直後に内容があれば、記載あり。「該当事項はありません」なら記載なし。
+# 文中の言及（「…重要事象等は存在しておりません」）は見出しではない
+_HEADING_LINES: tuple[re.Pattern[str], ...] = tuple(
+    re.compile(rf"^[ \t]*{heading}[ \t]*$", re.M)
+    for heading in (r"\(継続企業の前提に関する事項\)", r"継続企業の前提に関する重要事象等")
 )
 _NONE = "該当事項はありません"
+# 一致の直後に続く否定（「存在しておりません」「認められない」など）は、記載ありとしない
+_NEGATED_TAIL = re.compile(r"^(し(て(い|おり))?(ない|ません|ませんでした)|せず|ない|ません|ず)")
 _NEXT_HEADING = re.compile(r"^\(.{1,40}\)")
 
 
@@ -58,9 +61,29 @@ def _sentence(flat: str, start: int, end: int) -> tuple[int, int]:
     return left, (len(flat) if right < 0 else right + 1)
 
 
-def _heading_has_content(flat: str, end: int) -> bool:
-    body = flat[end : end + 80]
-    return bool(body) and not body.startswith(_NONE) and not _NEXT_HEADING.match(body)
+def _heading_spans(doc_id: str, page_number: int, text: str) -> list[SourceSpan]:
+    """見出しの行の後に、「該当事項はありません」以外の内容があれば、見出しから最初の文末まで。"""
+    spans: list[SourceSpan] = []
+    for pattern in _HEADING_LINES:
+        for match in pattern.finditer(text):
+            rest, origin = _flatten(text[match.end() :])
+            body = rest[:80].lstrip()
+            if not body or body.startswith(_NONE) or _NEXT_HEADING.match(body):
+                continue
+            sentence_end = rest.find("。")
+            last = len(rest) - 1 if sentence_end < 0 else sentence_end
+            start = match.start() + (len(match.group(0)) - len(match.group(0).lstrip()))
+            end = match.end() + origin[last] + 1
+            spans.append(
+                SourceSpan(
+                    doc_id=doc_id,
+                    page=page_number,
+                    start=start,
+                    end=end,
+                    quote=text[start:end],
+                )
+            )
+    return spans
 
 
 def check_going_concern(doc_id: str, pages: Sequence[str]) -> GoingConcernResult:
@@ -70,11 +93,9 @@ def check_going_concern(doc_id: str, pages: Sequence[str]) -> GoingConcernResult
         ranges: list[tuple[int, int]] = []
         for pattern in _SIGNALS:
             for match in pattern.finditer(flat):
+                if _NEGATED_TAIL.match(flat[match.end() :]):
+                    continue
                 ranges.append(_sentence(flat, match.start(), match.end()))
-        for heading in _HEADINGS:
-            for match in heading.finditer(flat):
-                if _heading_has_content(flat, match.end()):
-                    ranges.append((match.start(), _sentence(flat, match.end(), match.end())[1]))
         for left, right in sorted(set(ranges)):
             start, end = origin[left], origin[right - 1] + 1
             spans.append(
@@ -86,6 +107,7 @@ def check_going_concern(doc_id: str, pages: Sequence[str]) -> GoingConcernResult
                     quote=text[start:end],
                 )
             )
+        spans += _heading_spans(doc_id, page_number, text)
     spans = _drop_nested(spans)
     return GoingConcernResult("signal_found" if spans else "no_signal", spans, len(pages))
 
@@ -138,11 +160,7 @@ def build_policy_rows(
     scrutiny: list[MetricEvidence] = []
     for name in _LEVEL_RATIOS:
         m = metrics[f"{name}.current"]
-        rows.append(
-            PolicyRow("第8条", m.label, m.level or "算定不能", [m.id])
-            if m.value is not None or m.level
-            else PolicyRow("第8条", m.label, "算定不能", [m.id])
-        )
+        rows.append(PolicyRow("第8条", m.label, m.level or "算定不能", [m.id]))
         if m.level == "要精査":
             scrutiny.append(m)
     if scrutiny:

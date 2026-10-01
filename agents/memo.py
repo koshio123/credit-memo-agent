@@ -29,6 +29,15 @@ class Flagged(BaseModel):
     issues: list[IssueRecord]
 
 
+class Failure(BaseModel):
+    """LLM の出力が形式を満たせず、書けなかった節。他の節の生成は続ける。"""
+
+    model_config = ConfigDict(frozen=True)
+
+    section: str  # all は、1回の呼び出しで全部の節を書くベースラインの失敗
+    message: str
+
+
 class ClaimsOut(BaseModel):
     """LLM の出力: 主張の一覧。"""
 
@@ -74,3 +83,4 @@ class MemoDraft(BaseModel):
     going_concern_signal: bool = False  # 第13条: 継続企業の前提に関する記載が見つかったか
     rejected: list[Flagged] = Field(default_factory=list[Flagged])  # 検査で除外した主張
     warnings: list[Flagged] = Field(default_factory=list[Flagged])  # 残したが警告のある主張
+    failures: list[Failure] = Field(default_factory=list[Failure])  # 形式を満たせず書けなかった節

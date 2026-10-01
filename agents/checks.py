@@ -57,8 +57,8 @@ def _numbers(text: str, *, only_checked: bool) -> set[str]:
         token = match.group(1).replace(",", "")
         unit = (match.group(2) or "").strip()
         if only_checked:
-            if unit == "年":
-                continue
+            if unit == "年" and "." not in token and len(token) == 4:
+                continue  # 暦の年（2026年）。債務償還年数の「5.2年」などは照合する
             is_checked = "." in token or len(token) >= 3 or unit in ("%", "％", "倍")
             if not is_checked:
                 continue
@@ -83,6 +83,16 @@ def check_claims(claims: Sequence[Claim], pool: EvidencePool) -> list[Issue]:
 
         cited = [pool.get(e) for e in claim.evidence_ids if e in pool]
         if not cited:
+            figures = sorted(_numbers(claim.text, only_checked=True))
+            if figures:
+                issues.append(
+                    Issue(
+                        "number_without_evidence",
+                        "warning",
+                        index,
+                        f"出典のない数値です: {', '.join(figures)}",
+                    )
+                )
             continue
         available: set[str] = set()
         for evidence in cited:

@@ -38,10 +38,14 @@ class _Refs:
         return "".join(f"[{n}]" for n in numbers)
 
 
-def _claims(claims: Sequence[Claim], refs: _Refs) -> list[str]:
+def _claims(claims: Sequence[Claim], refs: _Refs, warned: set[str]) -> list[str]:
     if not claims:
         return ["- （主張を得られなかった。資料に記載がないことを意味しない。検査の記録を参照）"]
-    return [f"- {c.text} {refs.of(c.evidence_ids)}".rstrip() for c in claims]
+    mark = " ⚠数値要確認"
+    return [
+        f"- {c.text} {refs.of(c.evidence_ids)}".rstrip() + (mark if c.text in warned else "")
+        for c in claims
+    ]
 
 
 def _pages(item: PassageEvidence) -> str:
@@ -149,8 +153,8 @@ def _policy_table(memo: MemoDraft, refs: _Refs) -> list[str]:
     return lines
 
 
-def _open_items(memo: MemoDraft, result: MemoResult, refs: _Refs) -> list[str]:
-    lines = _claims(memo.open_items, refs) if memo.open_items else []
+def _open_items(memo: MemoDraft, result: MemoResult, refs: _Refs, warned: set[str]) -> list[str]:
+    lines = _claims(memo.open_items, refs, warned) if memo.open_items else []
     for name in LEVEL_RATIOS:
         m = result.metrics[f"{name}.current"]
         if m.value is None:
@@ -191,6 +195,13 @@ def _inspection(memo: MemoDraft) -> list[str]:
         "",
         "主張が1件も得られなかった節: " + ("、".join(empty) if empty else "なし"),
         "",
+        "生成に失敗した節（LLM の出力が指定の形を満たせなかった）: "
+        + (
+            "、".join(f"{f.section}（{f.message[:80]}）" for f in memo.failures)
+            if memo.failures
+            else "なし"
+        ),
+        "",
         "検査で除外した主張（メモの本文には入れていない）:",
         *_flag_lines(memo.rejected),
         "",
@@ -203,19 +214,20 @@ def _inspection(memo: MemoDraft) -> list[str]:
 def render_memo(result: MemoResult) -> str:
     memo, pool = result.memo, result.pool
     refs = _Refs()
+    warned = {f.claim.text for f in memo.warnings}
     out: list[str] = _header(memo)
     out += ["## 0. 最優先の確認事項", "", *_going_concern(memo, pool, refs), ""]
-    out += ["## 1. 企業概要", "", *_claims(memo.overview, refs), ""]
+    out += ["## 1. 企業概要", "", *_claims(memo.overview, refs, warned), ""]
     out += ["## 2. 財務分析", "", "### 2.1 主要指標（2期比較）", ""]
     out += [*_metric_table(result, refs), ""]
-    out += ["### 2.2 所見", "", *_claims(memo.financial_findings, refs), ""]
+    out += ["### 2.2 所見", "", *_claims(memo.financial_findings, refs, warned), ""]
     out += ["### 2.3 有利子負債の構成", "", *_debt_table(result, refs), ""]
-    out += ["## 3. 事業リスク", "", *_claims(memo.business_risks, refs), ""]
+    out += ["## 3. 事業リスク", "", *_claims(memo.business_risks, refs, warned), ""]
     out += ["## 4. 内規への照合結果", "", *_policy_table(memo, refs), ""]
     out += ["## 5. 与信判断上の論点", "", "### 肯定的な要素", ""]
-    out += [*_claims(memo.positives, refs), "", "### 否定的な要素", ""]
-    out += [*_claims(memo.negatives, refs), "", "（結論は記載しない。規程 第17条）", ""]
-    out += ["## 6. 確認が必要な事項", "", *_open_items(memo, result, refs), ""]
+    out += [*_claims(memo.positives, refs, warned), "", "### 否定的な要素", ""]
+    out += [*_claims(memo.negatives, refs, warned), "", "（結論は記載しない。規程 第17条）", ""]
+    out += ["## 6. 確認が必要な事項", "", *_open_items(memo, result, refs, warned), ""]
 
     out += ["## 出典一覧", "", "| 番号 | 資料 | ページ | 該当箇所 |", "| --- | --- | --- | --- |"]
     by_number = sorted((number, evidence_id) for evidence_id, number in refs.order.items())

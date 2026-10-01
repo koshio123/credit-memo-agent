@@ -6,11 +6,11 @@
   - マルチエージェント: Planner が問いを決め、Worker が節ごとに書き、Drafter が論点をまとめる。
 """
 
-from collections.abc import Sequence
+from collections.abc import Coroutine, Sequence
 from dataclasses import dataclass
 
-from agents.evidence import collect_metrics, collect_passages
-from agents.memo import DraftOut, Flagged, MemoDraft, MemoOut
+from agents.evidence import LEVEL_RATIOS, collect_metrics, collect_passages
+from agents.memo import DraftOut, Failure, Flagged, MemoDraft, MemoOut
 from agents.planner import DEFAULT_OVERVIEW_QUERIES, DEFAULT_RISK_QUERIES, make_plan
 from agents.policy import GoingConcernResult, build_policy_rows, check_going_concern
 from agents.prompts import (
@@ -22,14 +22,13 @@ from agents.prompts import (
     memo_prompt,
     render_evidence,
 )
-from agents.state import Claim, EvidencePool, MetricEvidence, PassageEvidence
+from agents.state import Claim, Evidence, EvidencePool, MetricEvidence, PassageEvidence
 from agents.workers import Context, screen, write_claims
+from edinet_mcp.models import CompanyInfo
 from edinet_mcp.service import EdinetService
-from llm.structured import complete_structured
+from llm.structured import StructuredOutputError, complete_structured
 from llm.types import LLMBackend, LLMRequest, Message
 from llm.usage import CountingBackend
-
-Evidence = MetricEvidence | PassageEvidence
 
 # 財務の所見に渡す数値の証拠（内規照合の記録などは除く）
 _FINANCIAL_PREFIXES = (
@@ -71,19 +70,26 @@ def _unique(evidence: Sequence[PassageEvidence]) -> list[PassageEvidence]:
     return list(seen.values())
 
 
+_SUMMARY_KEYS = (*LEVEL_RATIOS, "sales_growth")  # Planner に見せる財務指標
+
+
 def _summary(metrics: dict[str, MetricEvidence]) -> str:
     lines = [
         f"- {m.label}: {m.display}" + (f"（{m.level}）" if m.level else "")
         for key, m in metrics.items()
-        if key.endswith(".current") and key.split(".")[0] in _FINANCIAL_PREFIXES[:6]
+        if key.endswith(".current") and key.split(".")[0] in _SUMMARY_KEYS
     ]
     return "\n".join(lines)
 
 
-def _new_memo(
-    service: EdinetService, sec_code: str, metrics: dict[str, MetricEvidence]
-) -> MemoDraft:
-    info = next(c for c in service.list_companies() if c.sec_code == sec_code.strip())
+def _company_info(service: EdinetService, sec_code: str) -> CompanyInfo:
+    for info in service.list_companies():
+        if info.sec_code == sec_code.strip():
+            return info
+    raise ValueError(f"証券コード {sec_code!r} は対象外です")
+
+
+def _new_memo(info: CompanyInfo) -> MemoDraft:
     return MemoDraft(
         sec_code=info.sec_code,
         company=info.name,
@@ -130,9 +136,12 @@ async def run_baseline(service: EdinetService, backend: LLMBackend, sec_code: st
         tier="standard",
         max_tokens=ctx.max_tokens * 2,
     )
-    out = await complete_structured(counting, request, MemoOut)
-
-    memo = _new_memo(service, sec_code, ctx.metrics)
+    memo = _new_memo(_company_info(service, sec_code))
+    try:
+        out = await complete_structured(counting, request, MemoOut)
+    except StructuredOutputError as e:
+        memo.failures.append(Failure(section="all", message=str(e)[:300]))
+        out = MemoOut()
     offered = {e.id for e in evidence}
     for section in (
         "overview",
@@ -161,23 +170,30 @@ async def run_multi_agent(service: EdinetService, backend: LLMBackend, sec_code:
     pool = EvidencePool()
     ctx = Context(counting, service, pool, sec_code)
     ctx.metrics = collect_metrics(service, sec_code, pool)
-    memo = _new_memo(service, sec_code, ctx.metrics)
-    info = next(c for c in service.list_companies() if c.sec_code == memo.sec_code)
+    info = _company_info(service, sec_code)
+    memo = _new_memo(info)
 
     plan = await make_plan(ctx, memo.company, info.industry, _summary(ctx.metrics))
 
-    # 概要
+    # 概要。各ワーカーは互いに独立だが、順に呼ぶ（claude_code は利用枠を使うので並行にしない。
+    # 並行にするかは、バックエンドごとに選べるようにする余地として残す）
     overview_found = collect_passages(
         service, sec_code, plan.overview_queries, pool, k=_PASSAGES_PER_QUERY
     )
     overview_evidence = _unique([p for ps in overview_found.values() for p in ps])
-    claims = await write_claims(ctx, OVERVIEW_TASK, overview_evidence, max_claims=4)
+    claims = await _guarded(
+        memo, "overview", write_claims(ctx, OVERVIEW_TASK, overview_evidence, max_claims=4)
+    )
     memo.overview, flagged = screen(claims, pool, {e.id for e in overview_evidence}, "overview")
     _record(memo, flagged)
 
     # 財務の所見
     financial_evidence = _financial_evidence(ctx.metrics)
-    claims = await write_claims(ctx, FINANCIAL_TASK, financial_evidence, max_claims=6)
+    claims = await _guarded(
+        memo,
+        "financial_findings",
+        write_claims(ctx, FINANCIAL_TASK, financial_evidence, max_claims=6),
+    )
     memo.financial_findings, flagged = screen(
         claims, pool, {e.id for e in financial_evidence}, "financial_findings"
     )
@@ -186,7 +202,9 @@ async def run_multi_agent(service: EdinetService, backend: LLMBackend, sec_code:
     # 事業リスク
     risk_found = collect_passages(service, sec_code, plan.risk_queries, pool, k=_PASSAGES_PER_QUERY)
     risk_evidence = _unique([p for ps in risk_found.values() for p in ps])
-    claims = await write_claims(ctx, RISK_TASK, risk_evidence, max_claims=6)
+    claims = await _guarded(
+        memo, "business_risks", write_claims(ctx, RISK_TASK, risk_evidence, max_claims=6)
+    )
     memo.business_risks, flagged = screen(
         claims, pool, {e.id for e in risk_evidence}, "business_risks"
     )
@@ -213,7 +231,12 @@ async def run_multi_agent(service: EdinetService, backend: LLMBackend, sec_code:
         tier="standard",
         max_tokens=ctx.max_tokens,
     )
-    drafted = await complete_structured(counting, request, DraftOut)
+    try:
+        drafted = await complete_structured(counting, request, DraftOut)
+    except StructuredOutputError as e:
+        section = "positives/negatives/open_items"
+        memo.failures.append(Failure(section=section, message=str(e)[:300]))
+        drafted = DraftOut()
     for section in ("positives", "negatives", "open_items"):
         accepted, flagged = screen(
             getattr(drafted, section)[:5],
@@ -225,6 +248,17 @@ async def run_multi_agent(service: EdinetService, backend: LLMBackend, sec_code:
         setattr(memo, section, accepted)
         _record(memo, flagged)
     return _result(memo, pool, counting, "multi_agent", ctx.metrics)
+
+
+async def _guarded(
+    memo: MemoDraft, section: str, call: Coroutine[object, object, list[Claim]]
+) -> list[Claim]:
+    """形式を満たせない出力は、その節の失敗として記録し、他の節の生成は続ける。"""
+    try:
+        return await call
+    except StructuredOutputError as e:
+        memo.failures.append(Failure(section=section, message=str(e)[:300]))
+        return []
 
 
 def _id_number(evidence_id: str) -> int:

@@ -118,6 +118,33 @@ def test_別の証拠にだけある数値は_引用していなければ警告(
     assert kinds(issues) == ["number_not_in_evidence"]
 
 
+def test_債務償還年数の年は_照合する_暦の年だけ除く() -> None:
+    pool = EvidencePool()
+    pool.add(
+        MetricEvidence(
+            id="",
+            sec_code="9999",
+            company="x",
+            doc_id="D1",
+            label="債務償還年数",
+            period="current",
+            display="5.2年",
+            value=Decimal("5.2"),
+            basis="要償還債務 ÷ 償還原資 = 5.2年",
+        )
+    )
+    wrong = check_claims([Claim(text="債務償還年数は8.9年である。", evidence_ids=["E1"])], pool)
+    assert kinds(wrong) == ["number_not_in_evidence"]
+    assert (
+        check_claims([Claim(text="債務償還年数は5.2年である。", evidence_ids=["E1"])], pool) == []
+    )
+
+
+def test_出典のない主張の数値も_警告する_確認事項は出典なしでも書ける() -> None:
+    issues = check_claims([Claim(text="売上高は1,234百万円である。", evidence_ids=[])], _pool())
+    assert sorted(kinds(issues)) == ["no_evidence", "number_without_evidence"]
+
+
 def test_小さい整数や年は_数値の照合の対象にしない() -> None:
     claims = [Claim(text="2期連続で、2026年3月期に3つの事業がある。", evidence_ids=["E2"])]
     assert check_claims(claims, _pool()) == []

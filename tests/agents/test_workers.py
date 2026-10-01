@@ -221,6 +221,37 @@ async def test_検査で除外された主張は_メモに入れず_除外の記
     assert result.memo.rejected[0].section == "overview"
 
 
+async def test_1つのワーカーが形式を満たせなくても_他の節は残し_失敗を記録する(
+    service: EdinetService,
+) -> None:
+    eq, ps = ids(service)
+    plan = json.dumps({"overview_queries": [], "risk_queries": []})
+    backend = ScriptedBackend(
+        [
+            plan,
+            reply(claims=[claim("機械を製造している。", ps)]),
+            reply(claims=[claim("自己資本比率は50.0%である。", eq)]),
+            "だめ",  # リスクのワーカー: 2回とも形式を満たせない
+            "まだだめ",
+            reply(positives=[], negatives=[], open_items=[]),
+        ]
+    )
+    result = await run_multi_agent(service, backend, "9999")
+
+    assert result.memo.overview and result.memo.financial_findings
+    assert result.memo.business_risks == []
+    assert [f.section for f in result.memo.failures] == ["business_risks"]
+    assert result.memo.policy_rows  # 内規照合（コード）は影響を受けない
+
+
+async def test_ベースラインの形式の失敗は_全部の節の失敗として記録し_実行は続ける(
+    service: EdinetService,
+) -> None:
+    result = await run_baseline(service, ScriptedBackend(["だめ", "だめ"]), "9999")
+    assert [f.section for f in result.memo.failures] == ["all"]
+    assert result.memo.policy_rows
+
+
 async def test_バックエンドの失敗は_そのまま伝える(service: EdinetService) -> None:
     backend = ScriptedBackend([LLMBackendError("落ちた")])
     with pytest.raises(LLMBackendError):

@@ -89,6 +89,24 @@ async def test_主張を得られなかった節は_記載がないとは書か�
     assert "主張が1件も得られなかった節" in record and "企業概要" in record
 
 
+async def test_数値の警告がある主張は_本文でも印をつける(service: EdinetService) -> None:
+    result = await make_result(
+        service, extra={"financial_findings": [_claim("自己資本比率は67.4%である。", "E1")]}
+    )
+    body = render_memo(result).partition("## 検査の記録")[0]
+    line = next(x for x in body.splitlines() if "67.4%" in x)
+    assert "数値要確認" in line
+
+
+async def test_生成に失敗した節は_検査の記録に載せる(service: EdinetService) -> None:
+    from agents.memo import Failure
+
+    result = await make_result(service)
+    result.memo.failures.append(Failure(section="business_risks", message="形式を満たせない"))
+    record = render_memo(result).partition("## 検査の記録")[2]
+    assert "生成に失敗した節" in record and "business_risks" in record
+
+
 async def test_ヘッダーに_企業名_証券コード_期間_草案の注意がある(service: EdinetService) -> None:
     text = render_memo(await make_result(service))
     assert "サンプル工業" in text and "9999" in text
