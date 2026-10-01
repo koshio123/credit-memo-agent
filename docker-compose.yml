@@ -1,7 +1,6 @@
 services:
   db:
-    build: docker/postgres
-    image: credit-memo-agent-db:local
+    image: pgvector/pgvector:pg17
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-credit_memo}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-credit_memo}

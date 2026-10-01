@@ -30,7 +30,7 @@ EDINET の有価証券報告書から、出典つきの与信メモの草案を�
 uv sync                                   # Python 3.14 と依存を用意
 uv run pre-commit install
 cp .env.example .env                      # 値を編集する（キーは .env にだけ書き、コミットしない）
-docker compose up -d --wait               # PostgreSQL（pgvector + pg_bigm）
+docker compose up -d --wait               # PostgreSQL（pgvector）
 
 uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run pytest
 ```

@@ -68,7 +68,7 @@ class FakeSearcher:
         return self.indexed
 
     def search(
-        self, query: str, k: int, mode: str = "hybrid_bm25", doc_ids: Sequence[str] | None = None
+        self, query: str, k: int, mode: str = "hybrid", doc_ids: Sequence[str] | None = None
     ) -> list[Hit]:
         self.calls.append({"query": query, "k": k, "doc_ids": list(doc_ids or [])})
         chunk = Chunk(

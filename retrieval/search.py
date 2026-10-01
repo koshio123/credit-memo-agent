@@ -1,4 +1,4 @@
-"""検索の入口: 全文（pg_bigm）・BM25・ベクトル（pgvector）と、語句側とベクトル側の順位融合（RRF）。
+"""検索の入口: 語句（BM25）・ベクトル（pgvector）と、両者の順位融合（RRF）。
 
 方式ごとにスコアの尺度が違うので、融合はスコアではなく順位で行う。
 検索の前に、クエリを NFKC で正規化する（本文が NFKC で正規化されているため）。
@@ -16,9 +16,9 @@ from retrieval.embedding import Embedder
 from retrieval.fusion import rrf
 from retrieval.store import ChunkStore, Hit
 
-# lexical = pg_bigm の類似度 / bm25 = 文字2-gram の BM25
-# hybrid = lexical + vector / hybrid_bm25 = bm25 + vector（L2 評価で最良。既定）
-Mode = Literal["lexical", "bm25", "vector", "hybrid", "hybrid_bm25"]
+# bm25 = 文字2-gram の BM25 / vector = 埋め込みのコサイン類似度
+# hybrid = 両者の RRF 融合（L2 評価で最良。既定）
+Mode = Literal["bm25", "vector", "hybrid"]
 
 # 融合の前に、各方式から取る候補の数。k より多く取って、融合で上位を選ぶ
 _CANDIDATES = 50
@@ -94,22 +94,17 @@ class Retriever:
         self,
         query: str,
         k: int,
-        mode: Mode = "hybrid_bm25",
+        mode: Mode = "hybrid",
         doc_ids: Sequence[str] | None = None,
     ) -> list[Hit]:
         query = unicodedata.normalize("NFKC", query)
-        if mode == "lexical":
-            return self._store.search_lexical(query, k, doc_ids)
         if mode == "bm25":
             return self._lexical.search(query, k, doc_ids)
         if mode == "vector":
             return self._vector(query, k, doc_ids)
-        if mode in ("hybrid", "hybrid_bm25"):
+        if mode == "hybrid":
             n = max(k, _CANDIDATES)
-            if mode == "hybrid":
-                lexical = self._store.search_lexical(query, n, doc_ids)
-            else:
-                lexical = self._lexical.search(query, n, doc_ids)
+            lexical = self._lexical.search(query, n, doc_ids)
             vector = self._vector(query, n, doc_ids)
             by_id = {h.chunk.chunk_id: h for h in [*lexical, *vector]}
             fused = rrf([[h.chunk.chunk_id for h in lexical], [h.chunk.chunk_id for h in vector]])
