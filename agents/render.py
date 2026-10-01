@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from agents.evidence import DEBT_LABELS, LEVEL_RATIOS
 from agents.memo import Flagged, MemoDraft
 from agents.pipeline import MemoResult
-from agents.state import Claim, EvidencePool, MetricEvidence, PassageEvidence
+from agents.state import CLAIM_SECTIONS, Claim, EvidencePool, MetricEvidence, PassageEvidence
 
 _QUOTE_CHARS = 80
 _BASIS_CHARS = 120
@@ -174,18 +174,12 @@ def _flag_lines(items: Sequence[Flagged]) -> list[str]:
     ] or ["- なし"]
 
 
-_SECTIONS = (
-    ("overview", "企業概要"),
-    ("financial_findings", "財務の所見"),
-    ("business_risks", "事業リスク"),
-    ("positives", "肯定的な要素"),
-    ("negatives", "否定的な要素"),
-    ("open_items", "確認が必要な事項（LLM が挙げたもの）"),
-)
-
-
 def _inspection(memo: MemoDraft) -> list[str]:
-    empty = [label for key, label in _SECTIONS if not getattr(memo, key)]
+    empty = [
+        label + ("（LLM が挙げたもの）" if key == "open_items" else "")
+        for key, label in CLAIM_SECTIONS
+        if not getattr(memo, key)
+    ]
     return [
         "## 検査の記録",
         "",

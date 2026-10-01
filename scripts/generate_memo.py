@@ -34,8 +34,9 @@ MAX_CLAUDE_COMPANIES = 3
 async def main() -> int:
     try:
         return await _main()
-    except (EdinetMcpError, LLMBackendError, StructuredOutputError, ValueError) as e:
-        # 設定・入力の誤りやバックエンドの失敗は、理由だけを出して終わる
+    except LLMBackendError as e:
+        # バックエンドの作成の失敗（API キーが環境にある等）や、利用枠・接続の失敗。
+        # 会社ごとの問題ではないので、残りの会社も続けずに、理由だけを出して終わる
         log.error("失敗しました: %s", e)
         return 1
 
@@ -57,8 +58,15 @@ async def _main() -> int:
     service = build_service()
     run = run_multi_agent if args.mode == "multi_agent" else run_baseline
 
+    failed = 0
     for sec_code in args.sec_code:
-        result: MemoResult = await run(service, backend, sec_code)
+        try:
+            result: MemoResult = await run(service, backend, sec_code)
+        except (EdinetMcpError, StructuredOutputError) as e:
+            # 会社ごとの失敗（対象外の証券コード、データ未取得など）は、他の会社に影響させない
+            failed += 1
+            log.error("%s: 失敗しました: %s", sec_code, e)
+            continue
         model = backend.model_for("standard")
         md_path, _ = save_result(result, args.out, settings.llm_backend, model)
         log.info(
@@ -73,7 +81,7 @@ async def _main() -> int:
             len(result.memo.warnings),
             md_path,
         )
-    return 0
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

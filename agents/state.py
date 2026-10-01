@@ -89,3 +89,14 @@ class Claim(BaseModel):
 
     text: str = Field(min_length=1)
     evidence_ids: list[str] = Field(default_factory=list[str])
+
+
+# メモの、LLM が書く主張の節（キーは MemoDraft の項目名）。出力の節の並びとラベルの基準
+CLAIM_SECTIONS: tuple[tuple[str, str], ...] = (
+    ("overview", "企業概要"),
+    ("financial_findings", "財務の所見"),
+    ("business_risks", "事業リスク"),
+    ("positives", "肯定的な要素"),
+    ("negatives", "否定的な要素"),
+    ("open_items", "確認が必要な事項"),
+)

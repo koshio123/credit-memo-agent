@@ -25,7 +25,7 @@ from agents.prompts import (
 from agents.state import Claim, Evidence, EvidencePool, MetricEvidence, PassageEvidence
 from agents.workers import Context, screen, write_claims
 from edinet_mcp.models import CompanyInfo
-from edinet_mcp.service import EdinetService
+from edinet_mcp.service import EdinetMcpError, EdinetService
 from llm.structured import StructuredOutputError, complete_structured
 from llm.types import LLMBackend, LLMRequest, Message
 from llm.usage import CountingBackend
@@ -86,7 +86,7 @@ def _company_info(service: EdinetService, sec_code: str) -> CompanyInfo:
     for info in service.list_companies():
         if info.sec_code == sec_code.strip():
             return info
-    raise ValueError(f"証券コード {sec_code!r} は対象外です")
+    raise EdinetMcpError(f"証券コード {sec_code!r} は対象外です")
 
 
 def _new_memo(info: CompanyInfo) -> MemoDraft:
