@@ -49,6 +49,9 @@ CURRENT = {
     "CurrentLiabilities": 300,
     "NetSales": 2000,
     "OperatingIncome": 200,
+    "ShortTermLoansPayable": 100,
+    "CurrentPortionOfLongTermLoansPayable": 50,
+    "LongTermLoansPayable": 250,
 }
 PREVIOUS = {**CURRENT, "NetSales": 1800, "OperatingIncome": 150}
 FACTS = _facts("CurrentYear", CURRENT) + _facts("Prior1Year", PREVIOUS)

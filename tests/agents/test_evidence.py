@@ -80,6 +80,37 @@ def test_証拠のIDは_収集の順にE1から振られる(service: EdinetServi
     assert "E1" in pool.items
 
 
+# ---- 有利子負債の構成（第15条） ----
+
+
+def test_有利子負債の合計と内訳を証拠にする(service: EdinetService) -> None:
+    m = collect_metrics(service, "9999", EvidencePool())
+    total = m["interest_bearing_debt.current"]
+    assert total.value == Decimal(400)
+    assert total.display == "400円"
+    assert "短期借入金 100" in total.basis and "長期借入金 250" in total.basis
+    assert m["short_term_borrowings.current"].display == "100円"
+    assert "long_term_borrowings.current" in m
+    assert "bonds.current" not in m  # 項目が無い内訳は作らない
+
+
+def test_1年以内に返済する有利子負債の割合を計算する(service: EdinetService) -> None:
+    ratio = collect_metrics(service, "9999", EvidencePool())["debt_due_within_1y_ratio.current"]
+    assert ratio.value == Decimal(150) / Decimal(400) * 100  # (100 + 50) / 400
+    assert ratio.display == "37.5%"
+    assert "リース債務" in ratio.basis  # 1年以内の分が分けられない旨
+
+
+def test_有利子負債が無ければ_割合は算定不能() -> None:
+    # 合成データには内訳があるので、ゼロの場合は関数を直接確かめる
+    from agents.evidence import debt_due_within_1y
+    from finance.ratios import PeriodFinancials
+
+    value, basis = debt_due_within_1y(PeriodFinancials(short_term_borrowings=Decimal(0)))
+    assert value is None
+    assert "算定不能" in basis
+
+
 # ---- 本文 ----
 
 

@@ -11,7 +11,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from agents.state import EvidencePool, MetricEvidence, PassageEvidence
 from edinet_mcp.models import FinancialsResult, Period, RatiosResult
 from edinet_mcp.service import EdinetService
-from finance.ratios import FlagResult, RatioResult
+from finance.ratios import FlagResult, PeriodFinancials, RatioResult
 
 # 指標 -> 算式の入力項目（PeriodFinancials の項目名）。XBRL の項目名・PDF のページの絞り込み用
 _DEBT_FIELDS = (
@@ -54,6 +54,21 @@ FIGURES: dict[str, str] = {
     "total_assets": "総資産",
     "net_assets": "純資産",
 }
+DEBT_LABELS: dict[str, str] = {
+    "short_term_borrowings": "短期借入金",
+    "commercial_paper": "コマーシャル・ペーパー",
+    "current_portion_long_term_borrowings": "1年内返済予定の長期借入金",
+    "current_portion_bonds": "1年内償還予定の社債",
+    "bonds": "社債",
+    "long_term_borrowings": "長期借入金",
+    "lease_obligations": "リース債務",
+}
+_DUE_WITHIN_1Y = (
+    "short_term_borrowings",
+    "commercial_paper",
+    "current_portion_long_term_borrowings",
+    "current_portion_bonds",
+)
 _PERIOD_LABEL = {"current": "直近期", "previous": "前期"}
 _VALUE_AT_END = re.compile(r"=\s*(-?[\d,]+(?:\.\d+)?)\s*(?:%|倍|年)?\s*$")
 
@@ -64,6 +79,25 @@ def format_yen(value: Decimal) -> str:
         millions = (value / Decimal(1_000_000)).quantize(Decimal(1), rounding=ROUND_HALF_UP)
         return f"{millions:,}百万円"
     return f"{value:,.0f}円"
+
+
+def debt_due_within_1y(f: PeriodFinancials) -> tuple[Decimal | None, str]:
+    """1年以内に返済する有利子負債の割合（%）と、算式・入力値（規程 第15条）。
+
+    リース債務は XBRL で流動と固定が分かれていない（合算）ので、1年以内には含めない。
+    """
+    total = f.interest_bearing_debt
+    if total is None:
+        return None, "算定不能（有利子負債の内訳がどれも無い）"
+    if total <= 0:
+        return None, f"算定不能（有利子負債がゼロ以下: {total:,.0f}円）"
+    due = sum((getattr(f, name) or Decimal(0) for name in _DUE_WITHIN_1Y), Decimal(0))
+    value = due / total * 100
+    basis = (
+        f"1年以内に返済する有利子負債 {due:,.0f} ÷ 有利子負債 {total:,.0f} = {value:.1f}%"
+        "（リース債務は流動と固定を分けられないため、1年以内には含めない）"
+    )
+    return value, basis
 
 
 def _ratio_display(result: RatioResult) -> str:
@@ -150,6 +184,64 @@ def collect_metrics(
             )
 
     cur = financials["current"]
+    debt = cur.financials
+    parts = [(n, getattr(debt, n)) for n in DEBT_LABELS if getattr(debt, n) is not None]
+    if debt.interest_bearing_debt is not None:
+        xbrl_debt, pages_debt = _inputs([n for n, _ in parts], cur)
+        add(
+            "interest_bearing_debt.current",
+            MetricEvidence(
+                id="",
+                sec_code=cur.sec_code,
+                company=cur.company,
+                doc_id=cur.doc_id,
+                label="有利子負債（直近期）",
+                period="current",
+                display=format_yen(debt.interest_bearing_debt),
+                value=debt.interest_bearing_debt,
+                basis="有利子負債 = "
+                + " ＋ ".join(f"{DEBT_LABELS[n]} {v:,.0f}" for n, v in parts)
+                + f" = {debt.interest_bearing_debt:,.0f}円",
+                xbrl_items=xbrl_debt,
+                pdf_pages=pages_debt,
+            ),
+        )
+    for name, amount in parts:
+        xbrl_one, pages_one = _inputs((name,), cur)
+        add(
+            f"{name}.current",
+            MetricEvidence(
+                id="",
+                sec_code=cur.sec_code,
+                company=cur.company,
+                doc_id=cur.doc_id,
+                label=f"{DEBT_LABELS[name]}（直近期）",
+                period="current",
+                display=format_yen(amount),
+                value=amount,
+                basis=f"XBRL {xbrl_one.get(name, name)} = {amount:,.0f}円",
+                xbrl_items=xbrl_one,
+                pdf_pages=pages_one,
+            ),
+        )
+    due_value, due_basis = debt_due_within_1y(debt)
+    xbrl_due, pages_due = _inputs(list(DEBT_LABELS), cur)
+    add(
+        "debt_due_within_1y_ratio.current",
+        MetricEvidence(
+            id="",
+            sec_code=cur.sec_code,
+            company=cur.company,
+            doc_id=cur.doc_id,
+            label="1年以内に返済する有利子負債の割合（第15条）",
+            period="current",
+            display="算定不能" if due_value is None else f"{due_value:.1f}%",
+            value=due_value,
+            basis=due_basis,
+            xbrl_items=xbrl_due,
+            pdf_pages=pages_due,
+        ),
+    )
     for flag_name in ("consecutive_operating_loss", "sales_drop"):
         flag: FlagResult = getattr(ratios["current"].ratios, flag_name)
         add(
