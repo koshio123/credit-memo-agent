@@ -8,6 +8,7 @@ import pytest
 from edinet_mcp.service import EdinetService
 from evals.companies import Company, Filing, Filings, SelectionSnapshot
 from finance.ratios import compute_ratios
+from ingest.pdf_baseline import ExtractedValue
 from ingest.xbrl_facts import Fact, extract
 from retrieval.chunker import Chunk
 from retrieval.store import Hit
@@ -77,6 +78,15 @@ class FakeSearcher:
         return [Hit(chunk, 0.5, 1)]
 
 
+def fake_pdf_items(pages: list[str]) -> dict[str, ExtractedValue]:
+    """PDF 基準線の代わり。総資産は XBRL と同じ値、純資産は違う値、売上高は読めない。"""
+    return {
+        "total_assets": ExtractedValue(Decimal(1000), "BS", page=3, line="総資産 1,000"),
+        "net_assets": ExtractedValue(Decimal(999), "BS", page=3, line="純資産 999"),
+        "net_sales": ExtractedValue(None, reason="label_not_found"),
+    }
+
+
 @pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"  # trio は使わない
@@ -104,6 +114,7 @@ def service(searcher: FakeSearcher) -> EdinetService:
         companies=[company(), company("8888", "別の会社", "S100OTH0")],
         load_facts=load_facts,
         load_pages=load_pages,
+        pdf_items=fake_pdf_items,
     )
 
 

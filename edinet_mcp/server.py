@@ -74,14 +74,20 @@ def build_server(service: EdinetService) -> MCPServer:
         return guarded(lambda: service.get_financials(sec_code, period))
 
     @server.tool()
-    async def get_ratios(sec_code: SecCode) -> RatiosResult:
+    async def get_ratios(
+        sec_code: SecCode,
+        period: Annotated[
+            Period, Field(description="current（当期。前期との比較つき）か previous（前期）")
+        ] = "current",
+    ) -> RatiosResult:
         """架空の融資内規に基づく財務比率と水準（標準・留意・要精査）を計算して返す。
 
         自己資本比率・流動比率・営業利益率・インタレスト・カバレッジ・債務償還年数・売上高成長率と、
-        営業損失の連続・売上高の減少の該当。算定できない指標は理由つきで value が null になる。
+        営業損失の連続・売上高の減少の該当。period=previous は前期の分で、前々期が無いので成長率と
+        営業損失の連続は算定不能になる。算定できない指標は理由つきで value が null になる。
         融資の可否や条件は判断しない。value は丸めていない値。文章には basis の数字を使う。
         """
-        return guarded(lambda: service.get_ratios(sec_code))
+        return guarded(lambda: service.get_ratios(sec_code, period))
 
     @server.tool()
     async def get_page(

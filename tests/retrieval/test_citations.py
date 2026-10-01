@@ -3,8 +3,8 @@
 import pytest
 from pydantic import ValidationError
 
-from agents.citations import SourceSpan, SpanNotFoundError, locate_chunk, make_span, verify_span
 from retrieval.chunker import Chunk, chunk_pages
+from retrieval.citations import SourceSpan, SpanNotFoundError, locate_chunk, make_span, verify_span
 
 PAGES = [
     "表紙\n会社の概要",

@@ -3,8 +3,8 @@
 from decimal import Decimal
 
 from agents.checks import FORBIDDEN_PHRASES, Issue, check_claims, find_forbidden
-from agents.citations import SourceSpan
 from agents.state import Claim, EvidencePool, MetricEvidence, PassageEvidence
+from retrieval.citations import SourceSpan
 
 
 def _pool() -> EvidencePool:

@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from agents.citations import SourceSpan
+from retrieval.citations import SourceSpan
 
 
 class PassageEvidence(BaseModel):
