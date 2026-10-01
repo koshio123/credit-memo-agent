@@ -61,6 +61,7 @@ class MemoResult:
     input_tokens: int
     output_tokens: int
     mode: str
+    metrics: dict[str, MetricEvidence]
 
 
 def _unique(evidence: Sequence[PassageEvidence]) -> list[PassageEvidence]:
@@ -151,7 +152,7 @@ async def run_baseline(service: EdinetService, backend: LLMBackend, sec_code: st
         setattr(memo, section, accepted)
         _record(memo, flagged)
     _finish_policy(memo, service, pool, ctx.metrics)
-    return _result(memo, pool, counting, "baseline")
+    return _result(memo, pool, counting, "baseline", ctx.metrics)
 
 
 async def run_multi_agent(service: EdinetService, backend: LLMBackend, sec_code: str) -> MemoResult:
@@ -223,7 +224,7 @@ async def run_multi_agent(service: EdinetService, backend: LLMBackend, sec_code:
         )
         setattr(memo, section, accepted)
         _record(memo, flagged)
-    return _result(memo, pool, counting, "multi_agent")
+    return _result(memo, pool, counting, "multi_agent", ctx.metrics)
 
 
 def _id_number(evidence_id: str) -> int:
@@ -239,7 +240,11 @@ def _record(memo: MemoDraft, flagged: list[Flagged]) -> None:
 
 
 def _result(
-    memo: MemoDraft, pool: EvidencePool, counting: CountingBackend, mode: str
+    memo: MemoDraft,
+    pool: EvidencePool,
+    counting: CountingBackend,
+    mode: str,
+    metrics: dict[str, MetricEvidence],
 ) -> MemoResult:
     return MemoResult(
         memo=memo,
@@ -249,4 +254,5 @@ def _result(
         input_tokens=counting.input_tokens,
         output_tokens=counting.output_tokens,
         mode=mode,
+        metrics=metrics,
     )
