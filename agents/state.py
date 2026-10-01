@@ -66,6 +66,13 @@ class EvidencePool:
         self.items[stored.id] = stored
         return stored
 
+    def find_passage(self, spans: list[SourceSpan]) -> PassageEvidence | None:
+        """同じ出典スパンの本文の証拠があれば返す（別の問いで同じ箇所が見つかったときに使い回す）。"""
+        for item in self.items.values():
+            if isinstance(item, PassageEvidence) and item.spans == spans:
+                return item
+        return None
+
     def get(self, evidence_id: str) -> PassageEvidence | MetricEvidence:
         return self.items[evidence_id]
 

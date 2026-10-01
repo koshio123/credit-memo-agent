@@ -269,22 +269,19 @@ def collect_passages(
     k: int = 5,
 ) -> dict[str, list[PassageEvidence]]:
     """問いごとに検索し、本文の証拠を作る。同じ箇所が複数の問いで見つかっても、証拠は 1 つ。"""
-    known: dict[tuple[tuple[int, int, int], ...], PassageEvidence] = {}
     result: dict[str, list[PassageEvidence]] = {}
     for query in queries:
         evidences: list[PassageEvidence] = []
         for passage in service.search_filings(query, sec_code, k=k):
-            key = tuple((s.page, s.start, s.end) for s in passage.spans)
-            if key not in known:
-                known[key] = pool.add(
-                    PassageEvidence(
-                        id="",
-                        sec_code=passage.sec_code,
-                        company=passage.company,
-                        heading_path=passage.heading_path,
-                        spans=passage.spans,
-                    )
+            evidence = pool.find_passage(passage.spans) or pool.add(
+                PassageEvidence(
+                    id="",
+                    sec_code=passage.sec_code,
+                    company=passage.company,
+                    heading_path=passage.heading_path,
+                    spans=passage.spans,
                 )
-            evidences.append(known[key])
+            )
+            evidences.append(evidence)
         result[query] = evidences
     return result

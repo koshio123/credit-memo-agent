@@ -18,6 +18,7 @@ class CompanyInfo(BaseModel):
     industry: str
     doc_id: str  # 当期の有価証券報告書
     period_end: str
+    previous_period_end: str
 
 
 class Passage(BaseModel):

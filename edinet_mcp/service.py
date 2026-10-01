@@ -76,6 +76,7 @@ class EdinetService:
                 industry=c.industry,
                 doc_id=c.filings.current.doc_id,
                 period_end=c.filings.current.period_end,
+                previous_period_end=c.filings.previous.period_end,
             )
             for c in self._companies.values()
         ]
@@ -233,6 +234,10 @@ class EdinetService:
         )
 
     # ---- ページ ----
+
+    def all_pages(self, sec_code: str) -> list[str]:
+        """当期の有価証券報告書の全ページの本文。語句の検索など、コードが全体を調べるのに使う。"""
+        return list(self._pages(self._company(sec_code).filings.current.doc_id))
 
     def get_page(self, sec_code: str, page: int) -> PageResult:
         """当期の有価証券報告書の1ページ分の本文（1 始まり）。検索の出典を確かめるのに使う。"""
