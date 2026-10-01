@@ -22,6 +22,7 @@ EDINET の有価証券報告書から、出典つきの与信メモの草案を�
 - 計画: [PLAN.md](PLAN.md)
 - 設計判断（何を選び、何を諦めたか）: [docs/decisions.md](docs/decisions.md)
 - 開発環境の記録と再現手順: [docs/setup.md](docs/setup.md)
+- 手動テストの手順（W3 までの実装）: [docs/manual_test.md](docs/manual_test.md)
 - 開発規約: [CLAUDE.md](CLAUDE.md)
 
 ## 開発

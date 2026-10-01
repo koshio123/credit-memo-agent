@@ -16,9 +16,12 @@ from pathlib import Path
 
 from agents.export import save_result
 from agents.pipeline import MemoResult, run_baseline, run_multi_agent
+from edinet_mcp.service import EdinetMcpError
 from edinet_mcp.wiring import build_service
 from llm.factory import create_backend
 from llm.settings import LLMSettings
+from llm.structured import StructuredOutputError
+from llm.types import LLMBackendError
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 for _name in ("httpx", "httpcore", "huggingface_hub"):
@@ -29,6 +32,15 @@ MAX_CLAUDE_COMPANIES = 3
 
 
 async def main() -> int:
+    try:
+        return await _main()
+    except (EdinetMcpError, LLMBackendError, StructuredOutputError, ValueError) as e:
+        # 設定・入力の誤りやバックエンドの失敗は、理由だけを出して終わる
+        log.error("失敗しました: %s", e)
+        return 1
+
+
+async def _main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sec-code", nargs="+", required=True)
     parser.add_argument("--mode", choices=["multi_agent", "baseline"], default="multi_agent")
