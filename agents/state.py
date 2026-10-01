@@ -46,6 +46,8 @@ class MetricEvidence(BaseModel):
     basis: str  # 算式と入力値（規程 第7条）
     xbrl_items: dict[str, str] = Field(default_factory=dict[str, str])  # 入力項目 -> XBRL の項目名
     pdf_pages: list[int] = Field(default_factory=list[int])  # 入力値が載っている PDF のページ
+    # xbrl: XBRL・コードの算定結果 / search_record: コードが本文を語句で検索した記録（第13条）
+    origin: Literal["xbrl", "search_record"] = "xbrl"
 
     @property
     def text(self) -> str:

@@ -188,6 +188,7 @@ def _going_concern_row(pool: EvidencePool, doc_id: str, result: GoingConcernResu
             period="current",
             display="確認できなかった",
             value=Decimal(0),
+            origin="search_record",
             basis=(
                 f"有価証券報告書の全{result.n_pages}ページを語句で検索した結果、"
                 "重要事象等・重要な疑義・重要な不確実性が存在する旨の記載は見つからなかった。"

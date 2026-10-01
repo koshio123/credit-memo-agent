@@ -63,6 +63,20 @@ async def test_テンプレートの節が順に並ぶ(service: EdinetService) -
     assert positions == sorted(positions)
 
 
+async def test_出典一覧の資料名は_会社名と有価証券報告書の間を空ける(
+    service: EdinetService,
+) -> None:
+    sources = render_memo(await make_result(service)).partition("## 出典一覧")[2]
+    assert "サンプル工業 有価証券報告書（" in sources
+
+
+async def test_第13条の検索の記録は_XBRLの財務データとは書かない(service: EdinetService) -> None:
+    text = render_memo(await make_result(service))
+    row = next(line for line in text.partition("## 出典一覧")[2].splitlines() if "継続企業" in line)
+    assert "XBRL" not in row.split("|")[2]
+    assert "語句検索" in row
+
+
 async def test_ヘッダーに_企業名_証券コード_期間_草案の注意がある(service: EdinetService) -> None:
     text = render_memo(await make_result(service))
     assert "サンプル工業" in text and "9999" in text

@@ -53,15 +53,18 @@ def _source_row(number: int, item: MetricEvidence | PassageEvidence) -> str:
     if isinstance(item, PassageEvidence):
         where = f"{item.heading_path[-1]}: " if item.heading_path else ""
         doc = item.spans[0].doc_id
-        company = f"{item.company} " if item.company else ""
+        company = item.company
         return (
-            f"| {number} | {_cell(company)}有価証券報告書（{doc}） | {_pages(item)} | "
+            f"| {number} | {_cell(company)} 有価証券報告書（{doc}） | {_pages(item)} | "
             f"{_cell(_clip(where + item.text, _QUOTE_CHARS))} |"
         )
     pages = ", ".join(str(p) for p in item.pdf_pages)
-    company = f"{item.company} " if item.company else ""
+    company = _cell(item.company)
+    kind = (
+        "語句検索の記録（コードによる）" if item.origin == "search_record" else "財務データ（XBRL）"
+    )
     return (
-        f"| {number} | {_cell(company)}有価証券報告書（{item.doc_id}）の財務データ（XBRL） | "
+        f"| {number} | {company} 有価証券報告書（{item.doc_id}）の{kind} | "
         f"{'PDF p.' + pages if pages else '—'} | "
         f"{_cell(item.label)} {_cell(item.display)}: {_cell(_clip(item.basis, _BASIS_CHARS))} |"
     )
