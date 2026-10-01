@@ -1,13 +1,12 @@
-"""edinet_mcp のテストで使う、小さな合成データ。実データ（data/）には依存しない。"""
+"""edinet_mcp・agents のテストで使う、小さな合成データ。実データ（data/）には依存しない。"""
 
 from collections.abc import Sequence
 from decimal import Decimal
 
-import pytest
-
 from edinet_mcp.service import EdinetService
 from evals.companies import Company, Filing, Filings, SelectionSnapshot
-from finance.ratios import compute_ratios
+from finance.ratios import RatioReport, compute_ratios
+from ingest.pdf_baseline import ExtractedValue
 from ingest.xbrl_facts import Fact, extract
 from retrieval.chunker import Chunk
 from retrieval.store import Hit
@@ -50,6 +49,9 @@ CURRENT = {
     "CurrentLiabilities": 300,
     "NetSales": 2000,
     "OperatingIncome": 200,
+    "ShortTermLoansPayable": 100,
+    "CurrentPortionOfLongTermLoansPayable": 50,
+    "LongTermLoansPayable": 250,
 }
 PREVIOUS = {**CURRENT, "NetSales": 1800, "OperatingIncome": 150}
 FACTS = _facts("CurrentYear", CURRENT) + _facts("Prior1Year", PREVIOUS)
@@ -77,18 +79,16 @@ class FakeSearcher:
         return [Hit(chunk, 0.5, 1)]
 
 
-@pytest.fixture
-def anyio_backend() -> str:
-    return "asyncio"  # trio は使わない
+def fake_pdf_items(pages: list[str]) -> dict[str, ExtractedValue]:
+    """PDF 基準線の代わり。総資産は XBRL と同じ値、純資産は違う値、売上高は読めない。"""
+    return {
+        "total_assets": ExtractedValue(Decimal(1000), "BS", page=3, line="総資産 1,000"),
+        "net_assets": ExtractedValue(Decimal(999), "BS", page=3, line="純資産 999"),
+        "net_sales": ExtractedValue(None, reason="label_not_found"),
+    }
 
 
-@pytest.fixture
-def searcher() -> FakeSearcher:
-    return FakeSearcher()
-
-
-@pytest.fixture
-def service(searcher: FakeSearcher) -> EdinetService:
+def build_service(searcher: FakeSearcher) -> EdinetService:
     def load_facts(doc_id: str) -> list[Fact]:
         if doc_id == CUR_DOC:
             return FACTS
@@ -104,10 +104,11 @@ def service(searcher: FakeSearcher) -> EdinetService:
         companies=[company(), company("8888", "別の会社", "S100OTH0")],
         load_facts=load_facts,
         load_pages=load_pages,
+        pdf_items=fake_pdf_items,
     )
 
 
-def expected_ratios():
+def expected_ratios() -> RatioReport:
     current = extract(FACTS, "current").financials
     previous = extract(FACTS, "previous").financials
     return compute_ratios(current, previous)

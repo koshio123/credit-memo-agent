@@ -7,8 +7,7 @@ from mcp import Client
 
 from edinet_mcp.server import build_server
 from edinet_mcp.service import EdinetService
-
-from .conftest import CUR_DOC
+from tests.edinet_fakes import CUR_DOC
 
 pytestmark = pytest.mark.anyio
 
@@ -93,3 +92,19 @@ async def test_並行して呼んでも_結果が揃う(client: Client) -> None:
         for _ in range(8):
             tg.start_soon(call)
     assert results == [True] * 8
+
+
+async def test_前期の財務比率も呼べる(client: Client) -> None:
+    async with client:
+        result = await client.call_tool("get_ratios", {"sec_code": "9999", "period": "previous"})
+    data = result.structured_content
+    assert data["period"] == "previous"  # type: ignore[index]
+    assert data["ratios"]["sales_growth"]["value"] is None  # type: ignore[index]
+
+
+async def test_検索結果には_出典スパンがつく(client: Client) -> None:
+    async with client:
+        result = await client.call_tool("search_filings", {"query": "原材料", "sec_code": "9999"})
+    span = result.structured_content["result"][0]["spans"][0]  # type: ignore[index]
+    assert span["doc_id"] == CUR_DOC
+    assert span["quote"] in "3 【事業等のリスク】\n原材料価格が高騰する可能性があります。"

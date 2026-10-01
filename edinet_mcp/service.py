@@ -4,9 +4,11 @@
 - 比率と水準の判定は finance/ratios.py（架空の融資内規に基づく）。融資の可否は返さない。
 """
 
+import logging
 import unicodedata
 import zipfile
 from collections.abc import Callable, Sequence
+from decimal import Decimal
 from typing import Protocol
 
 from edinet_mcp.models import (
@@ -18,7 +20,8 @@ from edinet_mcp.models import (
     RatiosResult,
 )
 from evals.companies import Company
-from finance.ratios import compute_ratios
+from finance.ratios import PeriodFinancials, compute_ratios
+from ingest.pdf_baseline import ExtractedValue, extract_items
 from ingest.xbrl_facts import (
     Extraction,
     Fact,
@@ -26,7 +29,10 @@ from ingest.xbrl_facts import (
     UnsupportedAccountingStandard,
     extract,
 )
+from retrieval.citations import SourceSpan, SpanNotFoundError, locate_chunk
 from retrieval.store import Hit
+
+logger = logging.getLogger(__name__)
 
 MAX_K = 20
 POLICY_NOTE = (
@@ -54,11 +60,15 @@ class EdinetService:
         companies: Sequence[Company],
         load_facts: Callable[[str], list[Fact]],
         load_pages: Callable[[str], list[str]],
+        pdf_items: Callable[[list[str]], dict[str, ExtractedValue]] = extract_items,
     ) -> None:
         self._searcher = searcher
         self._companies = {c.sec_code: c for c in companies}
         self._load_facts = load_facts
         self._load_pages = load_pages
+        self._pdf_items = pdf_items
+        self._pages_cache: dict[str, list[str]] = {}
+        self._pdf_cache: dict[str, dict[str, ExtractedValue]] = {}
 
     # ---- 会社 ----
 
@@ -70,6 +80,7 @@ class EdinetService:
                 industry=c.industry,
                 doc_id=c.filings.current.doc_id,
                 period_end=c.filings.current.period_end,
+                previous_period_end=c.filings.previous.period_end,
             )
             for c in self._companies.values()
         ]
@@ -100,21 +111,55 @@ class EdinetService:
                 "空の結果と区別するため、エラーにしています"
             )
         hits = self._searcher.search(query, k, doc_ids=[filing.doc_id])
-        return [
-            Passage(
-                sec_code=company.sec_code,
-                company=company.name,
-                doc_id=hit.chunk.doc_id,
-                period_end=filing.period_end,
-                page_start=hit.chunk.page_start,
-                page_end=hit.chunk.page_end,
-                heading_path=hit.chunk.heading_path,
-                text=hit.chunk.text,
-                rank=hit.rank,
-                score=hit.score,
+        pages = self._pages(filing.doc_id)
+        passages: list[Passage] = []
+        for hit in hits:
+            try:
+                spans = self._spans(hit, pages)
+            except EdinetMcpError as e:
+                # 出典スパンを作れない本文は、出典にできないので返さない（他の結果は返す）
+                logger.warning("出典スパンを作れない検索結果を除きました: %s", e)
+                continue
+            passages.append(
+                Passage(
+                    sec_code=company.sec_code,
+                    company=company.name,
+                    doc_id=hit.chunk.doc_id,
+                    period_end=filing.period_end,
+                    page_start=hit.chunk.page_start,
+                    page_end=hit.chunk.page_end,
+                    heading_path=hit.chunk.heading_path,
+                    text=hit.chunk.text,
+                    spans=spans,
+                    rank=hit.rank,
+                    score=hit.score,
+                )
             )
-            for hit in hits
-        ]
+        return passages
+
+    @staticmethod
+    def _spans(hit: Hit, pages: list[str]) -> list[SourceSpan]:
+        try:
+            return locate_chunk(hit.chunk, pages)
+        except SpanNotFoundError as e:
+            raise EdinetMcpError(str(e)) from e
+
+    def _pages(self, doc_id: str) -> list[str]:
+        """書類のページごとの本文。一度読んだものは覚えておく。失敗は理由つきのエラーにする。"""
+        if doc_id in self._pages_cache:
+            return self._pages_cache[doc_id]
+        try:
+            pages = self._load_pages(doc_id)
+        except FileNotFoundError as e:
+            raise EdinetMcpError(f"書類 {doc_id} の PDF がありません。先に取得してください") from e
+        except Exception as e:  # PDF の解析器は様々な例外を出す。ファイルの読み込みの境界で受ける
+            raise EdinetMcpError(
+                f"書類 {doc_id} の PDF を読めません: {type(e).__name__}。取得し直してください"
+            ) from e
+        if not pages:
+            raise EdinetMcpError(f"書類 {doc_id} の PDF の本文を読めません（ページが0件）")
+        self._pages_cache[doc_id] = pages
+        return pages
 
     # ---- 財務数値・比率（XBRL） ----
 
@@ -149,7 +194,24 @@ class EdinetService:
             unit="円",
             financials=extraction.financials,
             provenance=extraction.provenance,
+            pdf_pages=self._pdf_pages(doc_id, extraction.financials) if period == "current" else {},
         )
+
+    def _pdf_pages(self, doc_id: str, financials: PeriodFinancials) -> dict[str, int]:
+        """PDF の基準線が、XBRL と同じ値を読んだ項目のページ。読めない・値が違う項目は含めない。"""
+        try:
+            if doc_id not in self._pdf_cache:
+                self._pdf_cache[doc_id] = self._pdf_items(self._pages(doc_id))
+            items = self._pdf_cache[doc_id]
+        except Exception as e:  # ページの付与は補助。失敗しても数値は返す
+            logger.warning("PDF のページを付けられませんでした（%s）: %s", doc_id, e)
+            return {}
+        found: dict[str, int] = {}
+        for name, item in items.items():
+            value: Decimal | None = getattr(financials, name, None)
+            if item.value is not None and item.page is not None and item.value == value:
+                found[name] = item.page
+        return found
 
     @staticmethod
     def _extract(doc_id: str, facts: list[Fact], period: Period) -> Extraction:
@@ -162,37 +224,41 @@ class EdinetService:
         except NoConsolidatedStatements as e:
             raise EdinetMcpError(f"書類 {doc_id}: {e}") from e
 
-    def get_ratios(self, sec_code: str) -> RatiosResult:
+    def get_ratios(self, sec_code: str, period: Period = "current") -> RatiosResult:
+        """当期（前期との比較つき）または前期の財務比率。前期は前々期が無く、成長率は算定不能。"""
+        if period not in ("current", "previous"):
+            raise EdinetMcpError(f"period は current か previous です（{period!r}）")
         company = self._company(sec_code)
         doc_id = company.filings.current.doc_id
         facts = self._facts(doc_id)  # 1回だけ読む（zip の展開と CSV の解析が重い）
-        current = self._extract(doc_id, facts, "current").financials
         previous = self._extract(doc_id, facts, "previous").financials
+        if period == "current":
+            report = compute_ratios(self._extract(doc_id, facts, "current").financials, previous)
+            filing = company.filings.current
+        else:
+            report = compute_ratios(previous, None)
+            filing = company.filings.previous
         return RatiosResult(
             sec_code=company.sec_code,
             company=company.name,
             doc_id=doc_id,
-            period_end=company.filings.current.period_end,
-            ratios=compute_ratios(current, previous),
+            period=period,
+            period_end=filing.period_end,
+            ratios=report,
             policy_note=POLICY_NOTE,
         )
 
     # ---- ページ ----
 
+    def all_pages(self, sec_code: str) -> list[str]:
+        """当期の有価証券報告書の全ページの本文。語句の検索など、コードが全体を調べるのに使う。"""
+        return list(self._pages(self._company(sec_code).filings.current.doc_id))
+
     def get_page(self, sec_code: str, page: int) -> PageResult:
         """当期の有価証券報告書の1ページ分の本文（1 始まり）。検索の出典を確かめるのに使う。"""
         company = self._company(sec_code)
         doc_id = company.filings.current.doc_id
-        try:
-            pages = self._load_pages(doc_id)
-        except FileNotFoundError as e:
-            raise EdinetMcpError(f"書類 {doc_id} の PDF がありません。先に取得してください") from e
-        except Exception as e:  # PDF の解析器は様々な例外を出す。ファイルの読み込みの境界で受ける
-            raise EdinetMcpError(
-                f"書類 {doc_id} の PDF を読めません: {type(e).__name__}。取得し直してください"
-            ) from e
-        if not pages:
-            raise EdinetMcpError(f"書類 {doc_id} の PDF の本文を読めません（ページが0件）")
+        pages = self._pages(doc_id)
         if not 1 <= page <= len(pages):
             raise EdinetMcpError(f"ページは 1 から {len(pages)} までです（{page}）")
         return PageResult(
