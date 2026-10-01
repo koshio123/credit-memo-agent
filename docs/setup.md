@@ -75,7 +75,8 @@ brew install ollama          # 0.35.0
 | コンテナ | `credit-memo-agent-db-1` | 起動時は `db` |
 
 - ホスト側のポートは **5433**（手元の PostgreSQL 17 が 5432 を使う可能性があるため）。`127.0.0.1` にだけ公開している。
-- 拡張の作成は、データディレクトリが空の初回起動でしか走らない。`docker/postgres/init/` を変えたら `docker compose down -v` でボリュームを消す。
+- 拡張（vector）は、`ChunkStore.connect` がスキーマの作成のときに作る（IF NOT EXISTS）。初期化用の SQL は置いていない。
+- **pg_bigm 入りの古いボリュームから移行する場合**（取り込み済みのデータを残すなら）: 先に、古いイメージのまま `DROP INDEX chunks_text_bigm_idx; DROP EXTENSION pg_bigm;` を実行してから、イメージを替える。この索引が残ったまま公式のイメージに替えると、`chunks` への書き込みが失敗する。データが要らなければ `docker compose down -v` で足りる。古いイメージは `docker rmi credit-memo-agent-db:local` で消せる。
 - 元に戻す: `docker compose down -v`（取り込み済みのデータも消える。`scripts.ingest_index` で作り直せる）。
 
 ### 2.5 埋め込みモデル（Hugging Face のキャッシュ）
@@ -116,7 +117,7 @@ brew install ollama          # 0.35.0
 
 | ファイル | 内容 |
 | --- | --- |
-| `docker-compose.yml`、`docker/postgres/` | PostgreSQL（pgvector）の環境 |
+| `docker-compose.yml` | PostgreSQL（公式の pgvector イメージ）の環境 |
 | `llm/` | LLM 呼び出しの抽象（型、キャッシュ、Ollama、Claude Code、テスト用の偽バックエンド、設定、ファクトリ） |
 | `retrieval/` | 本文のチャンク分け、埋め込み、BM25、RRF、PostgreSQL への保存と検索、取り込み |
 | `edinet_mcp/` | エージェント向けの MCP サーバー（検索・XBRL の財務数値・財務比率・ページ取得）。`uv run python -m edinet_mcp`（stdio。DB の起動と取り込みが要る） |

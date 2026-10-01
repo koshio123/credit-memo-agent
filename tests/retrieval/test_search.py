@@ -49,6 +49,13 @@ def test_融合は_BM25とベクトルの両方で上位のものを上に出す
     assert [h.rank for h in hits] == list(range(1, len(hits) + 1))
 
 
+def test_融合の順位は_1から順に並ぶ(loaded: tuple[ChunkStore, HashEmbedder]) -> None:
+    store, e = loaded
+    hits = Retriever(store, e).search("従業員の平均年齢", k=3, mode="hybrid")
+    assert [h.rank for h in hits] == list(range(1, len(hits) + 1))
+    assert [h.score for h in hits] == sorted((h.score for h in hits), reverse=True)
+
+
 def test_kで件数を絞る(loaded: tuple[ChunkStore, HashEmbedder]) -> None:
     store, e = loaded
     assert len(Retriever(store, e).search("従業員", k=1, mode="hybrid")) == 1
