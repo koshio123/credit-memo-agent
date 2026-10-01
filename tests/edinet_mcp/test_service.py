@@ -8,8 +8,7 @@ import pytest
 from edinet_mcp.service import EdinetMcpError, EdinetService
 from ingest.pdf_baseline import ExtractedValue
 from ingest.xbrl_facts import Fact
-
-from .conftest import (
+from tests.edinet_fakes import (
     CUR_DOC,
     FACTS,
     PAGES,

@@ -7,8 +7,7 @@ from mcp import Client
 
 from edinet_mcp.server import build_server
 from edinet_mcp.service import EdinetService
-
-from .conftest import CUR_DOC
+from tests.edinet_fakes import CUR_DOC
 
 pytestmark = pytest.mark.anyio
 

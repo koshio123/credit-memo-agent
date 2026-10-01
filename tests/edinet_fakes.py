@@ -1,13 +1,11 @@
-"""edinet_mcp のテストで使う、小さな合成データ。実データ（data/）には依存しない。"""
+"""edinet_mcp・agents のテストで使う、小さな合成データ。実データ（data/）には依存しない。"""
 
 from collections.abc import Sequence
 from decimal import Decimal
 
-import pytest
-
 from edinet_mcp.service import EdinetService
 from evals.companies import Company, Filing, Filings, SelectionSnapshot
-from finance.ratios import compute_ratios
+from finance.ratios import RatioReport, compute_ratios
 from ingest.pdf_baseline import ExtractedValue
 from ingest.xbrl_facts import Fact, extract
 from retrieval.chunker import Chunk
@@ -87,18 +85,7 @@ def fake_pdf_items(pages: list[str]) -> dict[str, ExtractedValue]:
     }
 
 
-@pytest.fixture
-def anyio_backend() -> str:
-    return "asyncio"  # trio は使わない
-
-
-@pytest.fixture
-def searcher() -> FakeSearcher:
-    return FakeSearcher()
-
-
-@pytest.fixture
-def service(searcher: FakeSearcher) -> EdinetService:
+def build_service(searcher: FakeSearcher) -> EdinetService:
     def load_facts(doc_id: str) -> list[Fact]:
         if doc_id == CUR_DOC:
             return FACTS
@@ -118,7 +105,7 @@ def service(searcher: FakeSearcher) -> EdinetService:
     )
 
 
-def expected_ratios():
+def expected_ratios() -> RatioReport:
     current = extract(FACTS, "current").financials
     previous = extract(FACTS, "previous").financials
     return compute_ratios(current, previous)

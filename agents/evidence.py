@@ -1,0 +1,198 @@
+"""証拠の収集: サービス層の結果から、数値と本文の証拠を作り、ID を振る。
+
+数値は XBRL とコードの算定結果（`finance/ratios.py`）から、本文は検索結果から作る。
+LLM はここで作られた証拠の ID を選ぶだけで、数値も引用文も書かない。
+"""
+
+import re
+from collections.abc import Sequence
+from decimal import ROUND_HALF_UP, Decimal
+
+from agents.state import EvidencePool, MetricEvidence, PassageEvidence
+from edinet_mcp.models import FinancialsResult, Period, RatiosResult
+from edinet_mcp.service import EdinetService
+from finance.ratios import FlagResult, RatioResult
+
+# 指標 -> 算式の入力項目（PeriodFinancials の項目名）。XBRL の項目名・PDF のページの絞り込み用
+_DEBT_FIELDS = (
+    "short_term_borrowings",
+    "commercial_paper",
+    "current_portion_long_term_borrowings",
+    "current_portion_bonds",
+    "bonds",
+    "long_term_borrowings",
+    "lease_obligations",
+)
+RATIO_INPUTS: dict[str, tuple[str, ...]] = {
+    "equity_ratio": ("net_assets", "total_assets"),
+    "current_ratio": ("current_assets", "current_liabilities"),
+    "operating_margin": ("operating_income", "net_sales"),
+    "interest_coverage": (
+        "operating_income",
+        "interest_income",
+        "dividend_income",
+        "interest_expense",
+    ),
+    "debt_repayment_years": (
+        *_DEBT_FIELDS,
+        "net_income_attributable_to_owners",
+        "depreciation",
+    ),
+    "sales_growth": ("net_sales",),
+}
+LEVEL_RATIOS = (
+    "equity_ratio",
+    "current_ratio",
+    "operating_margin",
+    "interest_coverage",
+    "debt_repayment_years",
+)
+FIGURES: dict[str, str] = {
+    "net_sales": "売上高",
+    "operating_income": "営業利益",
+    "net_income_attributable_to_owners": "親会社株主に帰属する当期純利益",
+    "total_assets": "総資産",
+    "net_assets": "純資産",
+}
+_PERIOD_LABEL = {"current": "直近期", "previous": "前期"}
+_VALUE_AT_END = re.compile(r"=\s*(-?[\d,]+(?:\.\d+)?)\s*(?:%|倍|年)?\s*$")
+
+
+def format_yen(value: Decimal) -> str:
+    """金額の表記。100万円以上は百万円（四捨五入）、それ未満は円。"""
+    if abs(value) >= 1_000_000:
+        millions = (value / Decimal(1_000_000)).quantize(Decimal(1), rounding=ROUND_HALF_UP)
+        return f"{millions:,}百万円"
+    return f"{value:,.0f}円"
+
+
+def _ratio_display(result: RatioResult) -> str:
+    if result.value is None:
+        return "算定不能"
+    match = _VALUE_AT_END.search(result.basis)
+    number = match.group(1) if match else f"{result.value:,.1f}"
+    return f"{number}{result.unit}"
+
+
+def _flag_display(flag: FlagResult) -> str:
+    if flag.applies is None:
+        return "判定不能"
+    return "該当" if flag.applies else "非該当"
+
+
+def _inputs(
+    fields: Sequence[str], financials: FinancialsResult
+) -> tuple[dict[str, str], list[int]]:
+    xbrl = {f: financials.provenance[f] for f in fields if f in financials.provenance}
+    pages = sorted({financials.pdf_pages[f] for f in fields if f in financials.pdf_pages})
+    return xbrl, pages
+
+
+def collect_metrics(
+    service: EdinetService, sec_code: str, pool: EvidencePool
+) -> dict[str, MetricEvidence]:
+    """財務比率・規程の留意事項・主要な金額の証拠を、当期と前期について作る。
+
+    キーは「項目.期」（例: equity_ratio.current）。
+    """
+    periods: tuple[Period, Period] = ("current", "previous")
+    financials = {p: service.get_financials(sec_code, p) for p in periods}
+    ratios: dict[str, RatiosResult] = {p: service.get_ratios(sec_code, p) for p in periods}
+    out: dict[str, MetricEvidence] = {}
+
+    def add(key: str, evidence: MetricEvidence) -> None:
+        out[key] = pool.add(evidence)
+
+    for period in periods:
+        fin = financials[period]
+        report = ratios[period].ratios
+        names = (*LEVEL_RATIOS, "sales_growth") if period == "current" else LEVEL_RATIOS
+        for name in names:
+            result: RatioResult = getattr(report, name)
+            xbrl, pages = _inputs(RATIO_INPUTS[name], fin)
+            add(
+                f"{name}.{period}",
+                MetricEvidence(
+                    id="",
+                    sec_code=fin.sec_code,
+                    company=fin.company,
+                    doc_id=fin.doc_id,
+                    label=result.name,
+                    period=period,
+                    display=_ratio_display(result),
+                    value=result.value,
+                    level=result.level.value if result.level else None,
+                    basis=result.basis,
+                    xbrl_items=xbrl,
+                    pdf_pages=pages,
+                ),
+            )
+        for field, label in FIGURES.items():
+            amount = getattr(fin.financials, field)
+            if amount is None:
+                continue
+            xbrl, pages = _inputs((field,), fin)
+            add(
+                f"{field}.{period}",
+                MetricEvidence(
+                    id="",
+                    sec_code=fin.sec_code,
+                    company=fin.company,
+                    doc_id=fin.doc_id,
+                    label=f"{label}（{_PERIOD_LABEL[period]}）",
+                    period=period,
+                    display=format_yen(amount),
+                    value=amount,
+                    basis=f"XBRL {xbrl.get(field, field)} = {amount:,.0f}円",
+                    xbrl_items=xbrl,
+                    pdf_pages=pages,
+                ),
+            )
+
+    cur = financials["current"]
+    for flag_name in ("consecutive_operating_loss", "sales_drop"):
+        flag: FlagResult = getattr(ratios["current"].ratios, flag_name)
+        add(
+            f"{flag_name}.current",
+            MetricEvidence(
+                id="",
+                sec_code=cur.sec_code,
+                company=cur.company,
+                doc_id=cur.doc_id,
+                label=f"{flag.name}（{flag.clause}）",
+                period="current",
+                display=_flag_display(flag),
+                value=None,
+                basis=flag.basis,
+            ),
+        )
+    return out
+
+
+def collect_passages(
+    service: EdinetService,
+    sec_code: str,
+    queries: Sequence[str],
+    pool: EvidencePool,
+    k: int = 5,
+) -> dict[str, list[PassageEvidence]]:
+    """問いごとに検索し、本文の証拠を作る。同じ箇所が複数の問いで見つかっても、証拠は 1 つ。"""
+    known: dict[tuple[tuple[int, int, int], ...], PassageEvidence] = {}
+    result: dict[str, list[PassageEvidence]] = {}
+    for query in queries:
+        evidences: list[PassageEvidence] = []
+        for passage in service.search_filings(query, sec_code, k=k):
+            key = tuple((s.page, s.start, s.end) for s in passage.spans)
+            if key not in known:
+                known[key] = pool.add(
+                    PassageEvidence(
+                        id="",
+                        sec_code=passage.sec_code,
+                        company=passage.company,
+                        heading_path=passage.heading_path,
+                        spans=passage.spans,
+                    )
+                )
+            evidences.append(known[key])
+        result[query] = evidences
+    return result

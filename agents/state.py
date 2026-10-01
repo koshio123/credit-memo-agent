@@ -42,13 +42,14 @@ class MetricEvidence(BaseModel):
     period: Literal["current", "previous"]
     display: str  # 文章に書く表記（例: 76.4%）。LLM はこの表記をそのまま使う
     value: Decimal | None  # None は算定不能
+    level: str | None = None  # 規程の水準（標準・留意・要精査）。区分のない指標は None
     basis: str  # 算式と入力値（規程 第7条）
     xbrl_items: dict[str, str] = Field(default_factory=dict[str, str])  # 入力項目 -> XBRL の項目名
     pdf_pages: list[int] = Field(default_factory=list[int])  # 入力値が載っている PDF のページ
 
     @property
     def text(self) -> str:
-        return f"{self.label} {self.display} {self.basis}"
+        return f"{self.label} {self.display} {self.level or ''} {self.basis}"
 
 
 Evidence = Annotated[PassageEvidence | MetricEvidence, Field(discriminator="kind")]
