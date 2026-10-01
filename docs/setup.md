@@ -120,6 +120,8 @@ brew install ollama          # 0.35.0
 | `docker-compose.yml` | PostgreSQL（公式の pgvector イメージ）の環境 |
 | `llm/` | LLM 呼び出しの抽象（型、キャッシュ、Ollama、Claude Code、テスト用の偽バックエンド、設定、ファクトリ） |
 | `retrieval/` | 本文のチャンク分け、埋め込み、BM25、RRF、PostgreSQL への保存と検索、取り込み |
+| `agents/` | メモを書くエージェント（証拠の収集、内規照合、Planner・ワーカー・パイプライン、Markdown 出力、出典と構造の検査） |
+| `scripts/generate_memo.py` | メモの生成。**実際に LLM を呼ぶ**（ローカルは `LOCAL_MODEL_*`・`LOCAL_NUM_CTX=32768`、Claude は `LLM_BACKEND=claude_code` で自分の利用枠を使う。一度に3社まで）。結果は `data/memos/` |
 | `edinet_mcp/` | エージェント向けの MCP サーバー（検索・XBRL の財務数値・財務比率・ページ取得）。`uv run python -m edinet_mcp`（stdio。DB の起動と取り込みが要る） |
 | `scripts/check_edinet_mcp.py`、`scripts/check_mcp_agent.py` | MCP サーバーの実機確認。後者は Claude の利用枠を少し使う |
 | `evals/l2.py`、`scripts/ingest_index.py`、`scripts/eval_l2.py` | 検索の評価（L2）と、取り込み・評価のコマンド。`uv run python -m scripts.<名前>` で実行 |
@@ -198,6 +200,8 @@ uv run python -m scripts.eval_l1_pdfplumber  # L1 評価（PDF の抽出精度�
 uv run python -m scripts.ingest_index        # チャンク分け・埋め込み・DB への保存（約2分）
 uv run python -m scripts.eval_l2             # L2 評価（検索）。結果は evals/reports/
 uv run python -m scripts.check_edinet_mcp    # MCP サーバーを stdio で起動して確認
+# メモの生成（LLM を呼ぶ。ローカルなら Ollama を起動し LOCAL_MODEL_* を設定）
+uv run python -m scripts.generate_memo --sec-code 6744 --mode multi_agent
 ```
 
 ## 9. 未完了・未確認
