@@ -1,0 +1,81 @@
+"""メモの材料の型: 証拠（本文・数値）と、証拠に結びつく主張。
+
+証拠の ID（E1, E2, ...）はコードが振る。LLM は ID を選ぶだけで、引用文も数値も書かない。
+"""
+
+from decimal import Decimal
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from agents.citations import SourceSpan
+
+
+class PassageEvidence(BaseModel):
+    """有価証券報告書の本文。検索で見つかったチャンクから、コードが作る。"""
+
+    model_config = ConfigDict(frozen=True)
+
+    kind: Literal["passage"] = "passage"
+    id: str
+    sec_code: str
+    company: str
+    heading_path: list[str]
+    spans: list[SourceSpan] = Field(min_length=1)  # ページごと（複数ページにまたがる場合は複数）
+
+    @property
+    def text(self) -> str:
+        return "\n".join(span.quote for span in self.spans)
+
+
+class MetricEvidence(BaseModel):
+    """コードが算定した数値。算式と入力値、XBRL の項目名、PDF のページを持つ。"""
+
+    model_config = ConfigDict(frozen=True)
+
+    kind: Literal["metric"] = "metric"
+    id: str
+    sec_code: str
+    company: str
+    doc_id: str
+    label: str  # 例: 自己資本比率
+    period: Literal["current", "previous"]
+    display: str  # 文章に書く表記（例: 76.4%）。LLM はこの表記をそのまま使う
+    value: Decimal | None  # None は算定不能
+    basis: str  # 算式と入力値（規程 第7条）
+    xbrl_items: dict[str, str] = Field(default_factory=dict[str, str])  # 入力項目 -> XBRL の項目名
+    pdf_pages: list[int] = Field(default_factory=list[int])  # 入力値が載っている PDF のページ
+
+    @property
+    def text(self) -> str:
+        return f"{self.label} {self.display} {self.basis}"
+
+
+Evidence = Annotated[PassageEvidence | MetricEvidence, Field(discriminator="kind")]
+
+
+class EvidencePool:
+    """証拠の集まり。追加すると、E1 から順に ID が振られる。"""
+
+    def __init__(self) -> None:
+        self.items: dict[str, PassageEvidence | MetricEvidence] = {}
+
+    def add[T: (PassageEvidence, MetricEvidence)](self, evidence: T) -> T:
+        stored = evidence.model_copy(update={"id": f"E{len(self.items) + 1}"})
+        self.items[stored.id] = stored
+        return stored
+
+    def get(self, evidence_id: str) -> PassageEvidence | MetricEvidence:
+        return self.items[evidence_id]
+
+    def __contains__(self, evidence_id: object) -> bool:
+        return evidence_id in self.items
+
+
+class Claim(BaseModel):
+    """メモの 1 つの主張。出典（証拠の ID）を 1 つ以上持たなければならない。"""
+
+    model_config = ConfigDict(frozen=True)
+
+    text: str = Field(min_length=1)
+    evidence_ids: list[str] = Field(default_factory=list[str])
