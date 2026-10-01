@@ -211,7 +211,7 @@ uv run python -m scripts.generate_memo --sec-code 6744 --mode multi_agent
 | Ollama との実機確認 | **完了**（`think`・`done_reason`・入力の切り捨て。結果は decisions.md） |
 | EDINET API キー | 取得・設定済み。確認スクリプトの初回実行でキーが画面に出たが、ユーザーの判断で再発行はしていない。原因は修正済み |
 | 対象企業 10 社の選定 | **完了**（`evals/datasets/companies.json`。経緯と限界は decisions.md） |
-| GitHub へのプッシュ・CI | W1 の途中までは実施・成功済み。**それ以降（W1 の一部と W2 全体）はローカルのみで、CI は未確認**。W2 で torch / sentence-transformers が依存に入ったので、CI のインストール時間と、`db` マークのテストが除外されること（`pytest -m "not llm and not db"`）を、プッシュ後に確認する |
+| GitHub へのプッシュ・CI | **確認済み**（2026-10-01 に W3 までを push。CI は 51 秒で成功。torch / sentence-transformers を含む依存の導入と、`db` マークのテストの除外が問題なく動く） |
 | エージェントがツールを使う方法 | **未決**（W3 の最初に決める。PLAN.md 9-4。案は、Worker が決定的なコードでサービス層を呼ぶ方式） |
 | L2 設問の人による確認 | 未実施（質問は Claude が根拠から作った。docs/decisions.md） |
 | `edinet-mcp` と Agent SDK の接続 | **完了**（`scripts/check_mcp_agent.py`。結果は decisions.md） |

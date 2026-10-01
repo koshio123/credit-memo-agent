@@ -1,10 +1,79 @@
-"""生成結果の保存: 読むための Markdown と、検査・使用量・証拠を含む JSON。"""
+"""生成結果の保存: 読むための Markdown と、検査・使用量・証拠を含む JSON。
 
-import json
+JSON は `SavedResult` の形で保存し、読み込むときも同じ型で検証する（確認用の出力などが、
+手で書き換えられた・版の違う JSON でも、理由の分かる形で失敗するように）。
+"""
+
 from pathlib import Path
 
+from pydantic import BaseModel, TypeAdapter, model_validator
+
+from agents.memo import MemoDraft
 from agents.pipeline import MemoResult
 from agents.render import render_memo
+from agents.state import CLAIM_SECTIONS, Evidence
+
+
+class BackendInfo(BaseModel):
+    name: str
+    model: str
+
+
+class UsageInfo(BaseModel):
+    calls: int
+    cached_calls: int
+    input_tokens: int
+    output_tokens: int
+
+
+class InspectionInfo(BaseModel):
+    rejected: int
+    warnings: int
+    failures: int = 0  # 古い JSON（この項目がない版）も読めるようにする
+
+
+class SavedResult(BaseModel):
+    mode: str
+    backend: BackendInfo
+    usage: UsageInfo
+    inspection: InspectionInfo
+    memo: MemoDraft
+    evidence: dict[str, Evidence]
+
+    @model_validator(mode="after")
+    def _evidence_exists(self) -> SavedResult:
+        for key, _ in CLAIM_SECTIONS:
+            for claim in getattr(self.memo, key):
+                for evidence_id in claim.evidence_ids:
+                    if evidence_id not in self.evidence:
+                        raise ValueError(
+                            f"主張が、保存された証拠にない出典 {evidence_id} を引用しています"
+                            f"（{key}: {claim.text[:40]}）"
+                        )
+        return self
+
+
+_EVIDENCE_MAP = TypeAdapter(dict[str, Evidence])
+
+
+def from_result(result: MemoResult, backend: str, model: str) -> SavedResult:
+    return SavedResult(
+        mode=result.mode,
+        backend=BackendInfo(name=backend, model=model),
+        usage=UsageInfo(
+            calls=result.calls,
+            cached_calls=result.cached_calls,
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+        ),
+        inspection=InspectionInfo(
+            rejected=len(result.memo.rejected),
+            warnings=len(result.memo.warnings),
+            failures=len(result.memo.failures),
+        ),
+        memo=result.memo,
+        evidence=_EVIDENCE_MAP.validate_python(dict(result.pool.items)),
+    )
 
 
 def save_result(result: MemoResult, out_dir: Path, backend: str, model: str) -> tuple[Path, Path]:
@@ -13,21 +82,10 @@ def save_result(result: MemoResult, out_dir: Path, backend: str, model: str) -> 
     md_path = out_dir / f"{stem}.md"
     json_path = out_dir / f"{stem}.json"
     md_path.write_text(render_memo(result), encoding="utf-8")
-    payload = {
-        "mode": result.mode,
-        "backend": {"name": backend, "model": model},
-        "usage": {
-            "calls": result.calls,
-            "cached_calls": result.cached_calls,
-            "input_tokens": result.input_tokens,
-            "output_tokens": result.output_tokens,
-        },
-        "inspection": {
-            "rejected": len(result.memo.rejected),
-            "warnings": len(result.memo.warnings),
-        },
-        "memo": result.memo.model_dump(mode="json"),
-        "evidence": {k: v.model_dump(mode="json") for k, v in result.pool.items.items()},
-    }
-    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    saved = from_result(result, backend, model)
+    json_path.write_text(saved.model_dump_json(indent=2), encoding="utf-8")
     return md_path, json_path
+
+
+def load_result(path: Path) -> SavedResult:
+    return SavedResult.model_validate_json(path.read_text(encoding="utf-8"))
