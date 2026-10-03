@@ -26,6 +26,24 @@ def ingest_document(
     embedders: Sequence[Embedder],
     max_chars: int = DEFAULT_MAX_CHARS,
 ) -> IngestResult:
+    """文書をチャンクに分けて保存し、渡されたモデルで埋め込む。
+
+    内容が変わっていなければ保存し直さず、埋め込み済みのモデルはやり直さない。
+
+    Args:
+        store: チャンクの保存先。
+        doc: 文書の情報。
+        pages: ページごとの本文。
+        embedders: 埋め込みに使うモデル。置き換えで消える埋め込みのモデルをすべて含める。
+        max_chars: 1チャンクの最大文字数。
+
+    Returns:
+        チャンク数と、モデルごとの埋め込み数・入力上限を超えた数。
+
+    Raises:
+        ValueError: 置き換えると消える埋め込みのモデルが embedders に無いとき、
+            またはベクトルの次元が宣言と違うとき。
+    """
     chunks = chunk_pages(doc.doc_id, pages, max_chars=max_chars)
     unchanged = store.get_document(doc.doc_id) == doc and store.chunks_unchanged(doc.doc_id, chunks)
     if not unchanged:

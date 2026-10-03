@@ -11,6 +11,11 @@ from edinet_mcp.wiring import build_service
 
 
 def main() -> int:
+    """MCP サーバーを stdio で起動する。
+
+    Returns:
+        終了コード。正常終了は 0。
+    """
     logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(message)s")
     for name in ("httpx", "httpcore", "huggingface_hub"):
         logging.getLogger(name).setLevel(logging.WARNING)

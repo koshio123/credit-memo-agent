@@ -60,7 +60,14 @@ class Extraction:
 
 
 def read_facts(csv_zip: Path) -> list[Fact]:
-    """EDINET の財務データ CSV（zip）から、財務諸表の数値の行を読む。"""
+    """EDINET の財務データ CSV（zip）から、財務諸表の数値の行を読む。
+
+    Args:
+        csv_zip: 財務データ CSV の zip のパス。
+
+    Returns:
+        数値の行（項目名・コンテキスト・値など）のリスト。数値でない行は除く。
+    """
     facts: list[Fact] = []
     with zipfile.ZipFile(csv_zip) as z:
         for name in z.namelist():
@@ -91,6 +98,19 @@ def read_facts(csv_zip: Path) -> list[Fact]:
 
 
 def _index(facts: list[Fact], period: Period) -> dict[str, Fact]:
+    """連結の J-GAAP の行から、期のコンテキストに合うものを項目名で引けるようにする。
+
+    Args:
+        facts: 読み込んだ数値の行。
+        period: 当期か前期か。
+
+    Returns:
+        項目名から行への対応。同じ項目が複数あれば最初の行。
+
+    Raises:
+        UnsupportedAccountingStandard: 連結財務諸表が IFRS のとき。
+        NoConsolidatedStatements: 連結の財務諸表の行が無いとき。
+    """
     contexts = _CONTEXTS[period]
     jgaap = [f for f in facts if f.namespace == "jppfs_cor" and f.consolidated == "連結"]
     if not jgaap:
@@ -112,7 +132,15 @@ def _index(facts: list[Fact], period: Period) -> dict[str, Fact]:
 
 
 def _sum(index: dict[str, Fact], names: list[str]) -> tuple[Decimal | None, list[str]]:
-    """存在する項目の合計。1つも無ければ None。"""
+    """存在する項目の合計。1つも無ければ None。
+
+    Args:
+        index: 項目名から行への対応。
+        names: 合計する項目名の候補。
+
+    Returns:
+        (合計, 使った項目名のリスト)。1つも無ければ (None, [])。
+    """
     used = [n for n in names if n in index]
     if not used:
         return None, []
@@ -120,12 +148,28 @@ def _sum(index: dict[str, Fact], names: list[str]) -> tuple[Decimal | None, list
 
 
 def _has(index: dict[str, Fact], name: str) -> bool:
-    """値のある行か。「－」（行はあるが金額なし）は、値のある行とは扱わない。"""
+    """値のある行か。「－」（行はあるが金額なし）は、値のある行とは扱わない。
+
+    Args:
+        index: 項目名から行への対応。
+        name: 項目名。
+
+    Returns:
+        値のある行があれば True。
+    """
     return name in index and not index[name].nil
 
 
 def _first(index: dict[str, Fact], names: list[str]) -> tuple[Decimal | None, list[str]]:
-    """値のある最初の候補。値のある候補が無く「－」の行だけがあれば 0、行が無ければ None。"""
+    """値のある最初の候補。値のある候補が無く「－」の行だけがあれば 0、行が無ければ None。
+
+    Args:
+        index: 項目名から行への対応。
+        names: 項目名の候補（優先順）。
+
+    Returns:
+        (値, 使った項目名のリスト)。行が無ければ (None, [])。
+    """
     for n in names:
         if _has(index, n):
             return index[n].value, [n]
@@ -140,7 +184,14 @@ _ELECTRONIC_PAYABLES = "ElectronicallyRecordedObligationsOperatingCL"  # 電子�
 
 
 def _receivables(index: dict[str, Fact]) -> tuple[Decimal | None, list[str]]:
-    """売上債権。合計の行があれば内訳は足さず、合計の行に含まれない行だけを足す。"""
+    """売上債権。合計の行があれば内訳は足さず、合計の行に含まれない行だけを足す。
+
+    Args:
+        index: 項目名から行への対応。
+
+    Returns:
+        (売上債権, 使った項目名のリスト)。行が無ければ (None, [])。
+    """
     if _has(index, "NotesAndAccountsReceivableTradeAndContractAssets"):
         # 受取手形、売掛金及び契約資産（契約資産を含む）。電子記録債権は別の行
         return _sum(
@@ -166,7 +217,15 @@ def _receivables(index: dict[str, Fact]) -> tuple[Decimal | None, list[str]]:
 
 
 def _inventories(index: dict[str, Fact]) -> tuple[Decimal | None, list[str]]:
-    """棚卸資産。合計の行があればそれ、無ければ内訳（不動産の販売用不動産、建設の未成工事支出金を含む）。"""
+    """棚卸資産。合計の行があればそれ、無ければ内訳（不動産の販売用不動産、
+    建設の未成工事支出金を含む）。
+
+    Args:
+        index: 項目名から行への対応。
+
+    Returns:
+        (棚卸資産, 使った項目名のリスト)。行が無ければ (None, [])。
+    """
     if _has(index, "Inventories"):
         return index["Inventories"].value, ["Inventories"]
     return _sum(
@@ -185,7 +244,14 @@ def _inventories(index: dict[str, Fact]) -> tuple[Decimal | None, list[str]]:
 
 
 def _payables(index: dict[str, Fact]) -> tuple[Decimal | None, list[str]]:
-    """仕入債務。電子記録債務（営業）は別の行なので足す。営業外の電子記録債務は含めない。"""
+    """仕入債務。電子記録債務（営業）は別の行なので足す。営業外の電子記録債務は含めない。
+
+    Args:
+        index: 項目名から行への対応。
+
+    Returns:
+        (仕入債務, 使った項目名のリスト)。行が無ければ (None, [])。
+    """
     if _has(index, "NotesAndAccountsPayableTrade"):
         return _sum(index, ["NotesAndAccountsPayableTrade", _ELECTRONIC_PAYABLES])
     if _has(index, "NotesPayableAccountsPayableForConstructionContractsAndOtherCNS"):
@@ -244,12 +310,30 @@ _DEBT: dict[str, list[str]] = {
 
 
 def extract(facts: list[Fact], period: Period) -> Extraction:
-    """当期（または前期）の連結財務データから、規程の入力項目を読む。"""
+    """当期（または前期）の連結財務データから、規程の入力項目を読む。
+
+    Args:
+        facts: 読み込んだ数値の行。
+        period: 当期か前期か。
+
+    Returns:
+        読み取った財務データと、項目ごとの XBRL の項目名。
+
+    Raises:
+        UnsupportedAccountingStandard: 連結財務諸表が IFRS のとき。
+        NoConsolidatedStatements: 連結の財務諸表の行が無いとき。
+    """
     index = _index(facts, period)
     values: dict[str, Decimal | None] = {}
     provenance: dict[str, str] = {}
 
     def put(field_name: str, result: tuple[Decimal | None, list[str]]) -> None:
+        """読み取り結果を、値と項目名の記録に入れる。
+
+        Args:
+            field_name: 財務データの項目名。
+            result: (値, 使った XBRL の項目名のリスト)。
+        """
         value, used = result
         values[field_name] = value
         if used:

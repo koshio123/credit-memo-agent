@@ -39,15 +39,36 @@ class Outcome(StrEnum):
 
     @property
     def correct(self) -> bool:
+        """正解として数える結果か。
+
+        Returns:
+            一致、または両方なしなら True。
+        """
         return self in (Outcome.MATCH, Outcome.BOTH_ABSENT)
 
 
 def _absent(truth: Decimal | None) -> bool:
-    """正解が「行なし」または 0（XBRL の「－」）。"""
+    """正解が「行なし」または 0（XBRL の「－」）。
+
+    Args:
+        truth: 正解の値。
+
+    Returns:
+        None または 0 なら True。
+    """
     return truth is None or truth == 0
 
 
 def classify(extracted: Decimal | None, truth: Decimal | None) -> Outcome:
+    """抽出した値を、正解と比べて分類する。
+
+    Args:
+        extracted: PDF から抽出した値。読めなければ None。
+        truth: XBRL の正解の値。
+
+    Returns:
+        一致・両方なし・不一致・未抽出・過剰のいずれか。
+    """
     if extracted is None:
         return Outcome.BOTH_ABSENT if _absent(truth) else Outcome.MISSING
     if _absent(truth):
@@ -66,6 +87,17 @@ class CompanyScore:
 def score_company(
     sec_code: str, name: str, items: dict[str, ExtractedValue], truth: PeriodFinancials
 ) -> CompanyScore:
+    """1社の抽出結果を、項目ごとに採点する。
+
+    Args:
+        sec_code: 証券コード。
+        name: 会社名。
+        items: 項目名から抽出結果への対応。
+        truth: 正解の財務データ。
+
+    Returns:
+        項目ごとの結果と、読めなかった理由。
+    """
     outcomes: dict[str, Outcome] = {}
     reasons: dict[str, str] = {}
     for field in FIELDS:
@@ -91,6 +123,14 @@ class Summary:
 
 
 def summarize(scores: list[CompanyScore]) -> Summary:
+    """全社の採点を、項目ごとに集計する。
+
+    Args:
+        scores: 会社ごとの採点。
+
+    Returns:
+        項目ごとの正答数・結果の内訳と、全体の正答数。
+    """
     per_field: dict[str, FieldSummary] = {}
     for field in FIELDS:
         counts = {o: 0 for o in Outcome}
@@ -106,6 +146,15 @@ def summarize(scores: list[CompanyScore]) -> Summary:
 
 
 def render_report(method: str, scores: list[CompanyScore]) -> str:
+    """L1 評価のレポートを Markdown にする。
+
+    Args:
+        method: 評価した方式の名前。
+        scores: 会社ごとの採点。
+
+    Returns:
+        項目ごとの集計と、正解にならなかったものの表を含む Markdown。
+    """
     summary = summarize(scores)
     lines = [
         f"# L1 評価: {method}",

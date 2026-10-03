@@ -65,6 +65,14 @@ class ExtractedValue:
 
 
 def _to_number(token: str) -> Decimal | None:
+    """数値の文字列を Decimal にする。
+
+    Args:
+        token: 空白で区切った1語。
+
+    Returns:
+        数値。「△」「▲」「-」は負、ダッシュだけの語は 0。数値でなければ None。
+    """
     if token in _DASHES:
         return Decimal(0)
     if not _NUMBER_RE.match(token):
@@ -79,7 +87,14 @@ def _to_number(token: str) -> Decimal | None:
 
 
 def _split(line: str) -> tuple[str, list[Decimal]]:
-    """行を、ラベルと、右端の数値（前期、当期の順）に分ける。数値が無ければ values は空。"""
+    """行を、ラベルと、右端の数値（前期、当期の順）に分ける。数値が無ければ values は空。
+
+    Args:
+        line: 本文の1行。
+
+    Returns:
+        (ラベル, 数値のリスト)。注記の印（※）で始まる語は除く。
+    """
     tokens = [t for t in line.split() if not t.startswith("※")]
     values: list[Decimal] = []
     while tokens:
@@ -93,7 +108,14 @@ def _split(line: str) -> tuple[str, list[Decimal]]:
 
 
 def parse_line(line: str) -> ParsedLine | None:
-    """「ラベル ※注記 前期 当期」の行を、ラベルと右端の数値に分ける。数値が無ければ None。"""
+    """「ラベル ※注記 前期 当期」の行を、ラベルと右端の数値に分ける。数値が無ければ None。
+
+    Args:
+        line: 本文の1行。
+
+    Returns:
+        分けた結果。数値が無い、ラベルが無い、またはラベルが数値のときは None。
+    """
     label, values = _split(line)
     if not values or not label or _to_number(label) is not None:
         return None
@@ -114,6 +136,12 @@ def _rows(page: str) -> list[_Row]:
     - 前半の行に数値が無く、後半の行の末尾に数値がある
     - ラベルだけの行の次が、数値だけの行
     どちらも、数値の無い直前の最大 2 行を結合したラベルも、照合の候補に加える。
+
+    Args:
+        page: ページの本文。
+
+    Returns:
+        数値のある行（ラベルの候補・数値・元の行）。
     """
     rows: list[_Row] = []
     pending: list[str] = []  # 数値の無い直前の行
@@ -136,6 +164,14 @@ def _rows(page: str) -> list[_Row]:
 
 
 def unit_of(text: str) -> int | None:
+    """本文に書かれた金額の単位を探す。
+
+    Args:
+        text: ページの本文。
+
+    Returns:
+        単位（円に直す倍率）。書かれていなければ None。
+    """
     match = _UNIT_RE.search(text)
     return _UNITS[match.group(1)] if match else None
 
@@ -143,6 +179,17 @@ def unit_of(text: str) -> int | None:
 def _heading_pages(
     pages: list[str], key: str, start: int = 0, need: str | None = None
 ) -> int | None:
+    """見出しの行があるページを探す。
+
+    Args:
+        pages: ページごとの本文。
+        key: 探す見出しの種類（_HEADINGS のキー）。
+        start: 探し始めるページ（0 始まり）。
+        need: 指定すると、この文字列を含むページだけを調べる。
+
+    Returns:
+        最初に見つかったページ（0 始まり）。無ければ None。
+    """
     pattern = _HEADINGS[key]
     for i in range(start, len(pages)):
         if need is not None and need not in pages[i]:
@@ -156,6 +203,12 @@ def find_sections(pages: list[str]) -> dict[str, list[int]]:
     """連結 BS / PL / CF のページ（0 始まり）を、見出しの行で特定する。
 
     見つからない範囲は含めない。
+
+    Args:
+        pages: ページごとの本文。
+
+    Returns:
+        BS・PL・CF から、そのページ番号のリストへの対応。
     """
     sections: dict[str, list[int]] = {}
     bs = _heading_pages(pages, "BS", need="資産の部")
@@ -207,7 +260,14 @@ _SIGNED_BY_LABEL = {"operating_income", "net_income_attributable_to_owners"}
 
 
 def _is_pure_loss_label(label: str) -> bool:
-    """「営業損失」のように、利益を含まない損失のラベルか。「営業損失(△)」は印字どおりに読む。"""
+    """「営業損失」のように、利益を含まない損失のラベルか。「営業損失(△)」は印字どおりに読む。
+
+    Args:
+        label: 行のラベル。
+
+    Returns:
+        利益を含まない損失のラベルなら True。
+    """
     return "損失" in label and "利益" not in label and "△" not in label
 
 
@@ -215,17 +275,40 @@ _PRIOR_COLUMN_HEADER = re.compile(r"^前連結会計年度\s*当連結会計年�
 
 
 def _before_notes(page: str) -> str:
-    """注記の見出しより前の本文。CF と注記が同じページにあっても、注記の同名の行を読まない。"""
+    """注記の見出しより前の本文。CF と注記が同じページにあっても、注記の同名の行を読まない。
+
+    Args:
+        page: ページの本文。
+
+    Returns:
+        注記の見出しより前の部分。見出しが無ければページ全体。
+    """
     match = _NOTES_RE.search(page)
     return page[: match.start()] if match else page
 
 
 def _page_unit(page: str, carried: int | None) -> int | None:
+    """ページの単位を決める。ページに無ければ直前のページの単位を引き継ぐ。
+
+    Args:
+        page: ページの本文。
+        carried: 直前のページの単位。
+
+    Returns:
+        単位（円に直す倍率）。どちらにも無ければ None。
+    """
     return unit_of(page) or carried
 
 
 def extract_items(pages: list[str]) -> dict[str, ExtractedValue]:
-    """連結財務諸表から、規程の入力項目のうち財務諸表にそのまま載っているものを読む。"""
+    """連結財務諸表から、規程の入力項目のうち財務諸表にそのまま載っているものを読む。
+
+    Args:
+        pages: ページごとの本文。
+
+    Returns:
+        項目名から抽出結果への対応。読めない項目は値が None で、理由が入る。
+    """
     sections = find_sections(pages)
     result: dict[str, ExtractedValue] = {}
     for name, (section, patterns) in _ITEMS.items():
@@ -282,6 +365,12 @@ def read_pages(path: Path) -> list[str]:
 
     注記の印（※1 など）は小さい文字で、数値に癒着して取り出されることがある
     （例: 「※1423,923」）。本文の中央値の 8 割より小さい文字を除いてから取り出す。
+
+    Args:
+        path: PDF のパス。
+
+    Returns:
+        ページごとの本文。
     """
     texts: list[str] = []
     with pdfplumber.open(path) as pdf:
@@ -303,6 +392,14 @@ class _TextCache(BaseModel):
 
 
 def _load_cache(cache: Path) -> list[str] | None:
+    """本文のキャッシュを読む。
+
+    Args:
+        cache: キャッシュのファイル。
+
+    Returns:
+        ページごとの本文。無い、壊れている、版が違う、空のときは None。
+    """
     try:
         data = _TextCache.model_validate_json(cache.read_text(encoding="utf-8"))
     except OSError, ValidationError:
@@ -317,7 +414,16 @@ def cached_pages(
     cache_dir: Path,
     reader: Callable[[Path], list[str]] = read_pages,
 ) -> list[str]:
-    """本文を、版番号つきでキャッシュして返す。版が違う・壊れている・空のキャッシュは使わない。"""
+    """本文を、版番号つきでキャッシュして返す。版が違う・壊れている・空のキャッシュは使わない。
+
+    Args:
+        pdf_path: PDF のパス。
+        cache_dir: キャッシュの保存先。
+        reader: PDF から本文を取り出す関数。テストで差し替える。
+
+    Returns:
+        ページごとの本文。
+    """
     cache = cache_dir / f"{pdf_path.stem}.json"
     if (pages := _load_cache(cache)) is not None:
         return pages

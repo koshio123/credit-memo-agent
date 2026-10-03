@@ -46,12 +46,29 @@ class _Dataset(BaseModel):
 
 
 def load_questions(split: str | None = None, path: Path = DATASET_PATH) -> list[Question]:
+    """評価用の質問を読む。
+
+    Args:
+        split: 読む分割（dev / heldout）。None なら全部。
+        path: 質問の JSON のパス。
+
+    Returns:
+        質問のリスト。
+    """
     dataset = _Dataset.model_validate(json.loads(path.read_text(encoding="utf-8")))
     return [q for q in dataset.questions if split is None or q.split == split]
 
 
 def is_relevant(chunk: Chunk, question: Question) -> bool:
-    """同じ文書で、根拠のページを含み、根拠の引用を含むチャンクなら正解。"""
+    """同じ文書で、根拠のページを含み、根拠の引用を含むチャンクなら正解。
+
+    Args:
+        chunk: 検索で取れたチャンク。
+        question: 質問。
+
+    Returns:
+        正解のチャンクなら True。
+    """
     if chunk.doc_id != question.doc_id:
         return False
     return any(
@@ -65,6 +82,13 @@ def is_on_gold_page(chunk: Chunk, question: Question) -> bool:
 
     メモに出典として付けるのはページなので、根拠の一文が隣のチャンクにあっても、
     同じページを取れていれば出典としては足りる。厳密な指標（is_relevant）の補助として使う。
+
+    Args:
+        chunk: 検索で取れたチャンク。
+        question: 質問。
+
+    Returns:
+        根拠のページを含むチャンクなら True。
     """
     return chunk.doc_id == question.doc_id and any(
         chunk.page_start <= g.page <= chunk.page_end for g in question.gold
@@ -91,6 +115,16 @@ class L2Metrics:
 def _first_rank(
     hits: Sequence[Hit], question: Question, match: Callable[[Chunk, Question], bool]
 ) -> int | None:
+    """最初に正解が現れる順位を探す。
+
+    Args:
+        hits: 順位順の検索結果。
+        question: 質問。
+        match: チャンクが正解かを判定する関数。
+
+    Returns:
+        最初の正解の順位（1始まり）。無ければ None。
+    """
     for i, hit in enumerate(hits, start=1):
         if match(hit.chunk, question):
             return i
@@ -98,6 +132,15 @@ def _first_rank(
 
 
 def _summarize(ranks: Sequence[int | None], ks: Sequence[int]) -> tuple[dict[int, float], float]:
+    """各質問の正解の順位から、Recall@k と MRR を求める。
+
+    Args:
+        ranks: 質問ごとの最初の正解の順位。正解が無ければ None。
+        ks: Recall を求める k。
+
+    Returns:
+        (k ごとの Recall, MRR)。MRR は MRR_DEPTH 位までを数える。
+    """
     n = len(ranks)
     recall = {k: sum(1 for r in ranks if r is not None and r <= k) / n for k in ks}
     mrr = sum(1 / r for r in ranks if r is not None and r <= MRR_DEPTH) / n
@@ -109,6 +152,19 @@ def evaluate(
     search: Callable[[Question], list[Hit]],
     ks: Sequence[int] = (1, 3, 5, 10),
 ) -> L2Metrics:
+    """検索方式を、質問の集まりで評価する。
+
+    Args:
+        questions: 評価する質問。
+        search: 質問から検索結果を返す関数。
+        ks: Recall を求める k。
+
+    Returns:
+        Recall@k・ページ単位の Recall・MRR・分類ごとの値・正解が取れなかった質問。
+
+    Raises:
+        ValueError: 質問が 0 件のとき。
+    """
     if not questions:
         raise ValueError("質問が0件です")
     ranks: dict[str, int | None] = {}
@@ -132,7 +188,15 @@ def evaluate(
 
 
 def longest_common_substring(a: str, b: str) -> int:
-    """2つの文字列の、最長の共通部分文字列の長さ。設問が根拠の写しになっていないかの目安に使う。"""
+    """2つの文字列の、最長の共通部分文字列の長さ。設問が根拠の写しになっていないかの目安に使う。
+
+    Args:
+        a: 一方の文字列。
+        b: もう一方の文字列。
+
+    Returns:
+        共通部分文字列の最長の長さ（文字数）。
+    """
     best = 0
     previous = [0] * (len(b) + 1)
     for ca in a:
@@ -148,6 +212,16 @@ def longest_common_substring(a: str, b: str) -> int:
 def render_report(
     title: str, systems: dict[str, L2Metrics], ks: Sequence[int] = (1, 3, 5, 10)
 ) -> str:
+    """L2 評価（検索）のレポートを Markdown にする。
+
+    Args:
+        title: レポートの見出し。
+        systems: 方式の名前から評価結果への対応。
+        ks: Recall を求める k。
+
+    Returns:
+        方式ごとの Recall・MRR・分類別の値・取れなかった質問の Markdown。
+    """
     columns = " | ".join(f"Recall@{k}" for k in ks)
     mid_k = ks[len(ks) // 2]
     lines = [

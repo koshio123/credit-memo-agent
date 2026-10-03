@@ -42,16 +42,41 @@ class Issue:
 
 
 def _normalize(text: str) -> str:
+    """NFKC で正規化し、空白を除く。
+
+    Args:
+        text: 元の文字列。
+
+    Returns:
+        全角半角と空白の違いをなくした文字列。
+    """
     return re.sub(r"\s+", "", unicodedata.normalize("NFKC", text))
 
 
 def find_forbidden(text: str) -> list[str]:
-    """主張の中の、結論を示す語（全角半角・空白の違いは無視する）。"""
+    """主張の中の、結論を示す語（全角半角・空白の違いは無視する）。
+
+    Args:
+        text: 主張の本文。
+
+    Returns:
+        含まれていた禁止語のリスト。無ければ空。
+    """
     normalized = _normalize(text)
     return [phrase for phrase in FORBIDDEN_PHRASES if phrase in normalized]
 
 
 def _numbers(text: str, *, only_checked: bool) -> set[str]:
+    """文字列から数値を取り出す。カンマは除く。
+
+    Args:
+        text: 数値を探す文字列。
+        only_checked: True なら、照合の対象になる数値（小数・カンマ区切り・3桁以上・
+            ％や倍の付く数）だけを取る。暦の年は除く。
+
+    Returns:
+        数値の文字列の集合。
+    """
     found: set[str] = set()
     for match in _NUMBER.finditer(unicodedata.normalize("NFKC", text)):
         token = match.group(1).replace(",", "")
@@ -67,6 +92,15 @@ def _numbers(text: str, *, only_checked: bool) -> set[str]:
 
 
 def check_claims(claims: Sequence[Claim], pool: EvidencePool) -> list[Issue]:
+    """主張を検査する。出典の有無と存在、結論を示す語、数値の照合まで。
+
+    Args:
+        claims: 検査する主張。
+        pool: 証拠の集まり。
+
+    Returns:
+        見つかった問題のリスト。claim_index は claims での位置。
+    """
     issues: list[Issue] = []
     for index, claim in enumerate(claims):
         if not claim.evidence_ids:

@@ -31,10 +31,28 @@ def build_server(service: EdinetService) -> MCPServer:
     # ツールは async def にして、イベントループの上で1つずつ実行する（同期の関数はスレッドで
     # 並行に走る）。サービスは1つの DB 接続・埋め込みモデル・BM25 の索引を共有しているため。
     # 1回の処理は短い（数十ミリ秒〜1秒）ので、直列でよい
+    """EDINET の MCP サーバーを作り、ツールを登録する。
+
+    Args:
+        service: ツールの処理を担うサービス層。
+
+    Returns:
+        ツール登録済みの MCP サーバー。
+    """
     server = MCPServer("edinet-mcp", instructions=INSTRUCTIONS)
 
     def guarded[T](call: Callable[[], T]) -> T:
-        """サービスの失敗を、エージェントに理由が見えるツールのエラーにする。"""
+        """サービスの失敗を、エージェントに理由が見えるツールのエラーにする。
+
+        Args:
+            call: サービスを呼ぶ関数。
+
+        Returns:
+            call の戻り値。
+
+        Raises:
+            ToolError: サービスが EdinetMcpError を出したとき。
+        """
         try:
             return call()
         except EdinetMcpError as e:

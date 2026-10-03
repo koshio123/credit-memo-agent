@@ -38,7 +38,14 @@ class Chunk:
 
 
 def _body_lines(page: str) -> list[str]:
-    """ページから、EDINET が付ける先頭の3行と末尾のページ番号を除いた本文の行を返す。"""
+    """ページから、EDINET が付ける先頭の3行と末尾のページ番号を除いた本文の行を返す。
+
+    Args:
+        page: 1ページ分の本文。
+
+    Returns:
+        前後の空白を取り、空行を除いた本文の行。
+    """
     lines = [line.strip() for line in page.split("\n")]
     if lines and lines[0] == "EDINET提出書類":
         lines = lines[1:]
@@ -54,6 +61,14 @@ def _body_lines(page: str) -> list[str]:
 
 
 def _heading_level(line: str) -> int | None:
+    """行が見出しなら、その階層を返す。
+
+    Args:
+        line: 本文の1行。
+
+    Returns:
+        見出しの階層（0 が最も浅い）。見出しでなければ None。
+    """
     for level, pattern in enumerate(_HEADINGS):
         if pattern.match(line):
             if level == len(_HEADINGS) - 1 and (_NUMBER_RUN.search(line) or _DATE.search(line)):
@@ -63,7 +78,15 @@ def _heading_level(line: str) -> int | None:
 
 
 def _split_long_line(line: str, max_chars: int) -> list[str]:
-    """max_chars より長い1行を、句点で区切って詰める。句点が無ければ文字数で切る。"""
+    """max_chars より長い1行を、句点で区切って詰める。句点が無ければ文字数で切る。
+
+    Args:
+        line: 長い1行。
+        max_chars: 1片の最大文字数。
+
+    Returns:
+        max_chars 以下に分けた文字列のリスト。
+    """
     sentences = [s for s in re.split(r"(?<=。)", line) if s]
     pieces: list[str] = []
     current = ""
@@ -85,7 +108,19 @@ DEFAULT_MAX_CHARS = 600
 
 
 def chunk_pages(doc_id: str, pages: list[str], max_chars: int = DEFAULT_MAX_CHARS) -> list[Chunk]:
-    """ページごとの本文（1始まりのページ番号は並び順）を、チャンクに分ける。"""
+    """ページごとの本文（1始まりのページ番号は並び順）を、チャンクに分ける。
+
+    Args:
+        doc_id: 書類ID。空にはできない。
+        pages: ページごとの本文。
+        max_chars: 1チャンクの最大文字数。
+
+    Returns:
+        文書内の連番で ID を振ったチャンクのリスト。
+
+    Raises:
+        ValueError: doc_id が空のとき。
+    """
     if not doc_id:
         raise ValueError("doc_id が空です")
 
@@ -95,6 +130,11 @@ def chunk_pages(doc_id: str, pages: list[str], max_chars: int = DEFAULT_MAX_CHAR
     buffer_pages: list[int] = []
 
     def heading_path() -> list[str]:
+        """いまの見出しの階層を、浅い順の見出しの文字列にして返す。
+
+        Returns:
+            見出しのリスト。
+        """
         return [text for _, text in path]
 
     def flush() -> None:

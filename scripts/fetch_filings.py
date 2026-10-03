@@ -21,6 +21,11 @@ DATA_DIR = Path("data/edinet")
 
 
 def main() -> int:
+    """EDINET から、各社の書類を取得する。
+
+    Returns:
+        終了コード。成功は 0、キー未設定または取得に失敗した書類があれば 1。
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", choices=sorted(DATASETS), default="dev")
     parser.add_argument(

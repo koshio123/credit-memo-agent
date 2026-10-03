@@ -33,6 +33,11 @@ LABELS = {
 
 
 def main() -> int:
+    """DB に接続して L2 評価を実行する。
+
+    Returns:
+        終了コード。正常終了は 0。
+    """
     store = ChunkStore.connect(DatabaseSettings().database_url)
     try:
         return run(store)
@@ -41,6 +46,14 @@ def main() -> int:
 
 
 def run(store: ChunkStore) -> int:
+    """検索方式ごとに L2 評価を実行し、レポートを書き出す。
+
+    Args:
+        store: チャンクの保存先。
+
+    Returns:
+        終了コード。正常終了は 0。
+    """
     embedders: dict[str, Embedder] = {
         key: SentenceTransformerEmbedder(spec) for key, spec in MODELS.items()
     }
@@ -48,6 +61,15 @@ def run(store: ChunkStore) -> int:
     retrievers = {key: Retriever(store, e, lexical) for key, e in embedders.items()}
 
     def system(key: str, mode: Mode) -> Callable[[Question], list[Hit]]:
+        """検索方式を、質問から検索結果を返す関数にする。
+
+        Args:
+            key: 埋め込みモデルのキー。
+            mode: 検索方式。
+
+        Returns:
+            質問の会社の文書に限って検索する関数。
+        """
         return lambda q: retrievers[key].search(
             q.question, k=max(KS), mode=mode, doc_ids=[q.doc_id]
         )

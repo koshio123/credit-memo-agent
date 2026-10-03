@@ -46,9 +46,16 @@ class OllamaBackend:
         client: httpx.AsyncClient | None = None,
         timeout: float = 300.0,
     ) -> None:
-        """
-        num_ctx: コンテキスト長。Ollama の既定は短く、超えた分のプロンプトは黙って切り捨てられる。
-        think: Qwen3 などの思考モード。思考トークンも max_tokens を消費するので、既定はオフ。
+        """Ollama のバックエンドを作る。
+
+        Args:
+            base_url: Ollama のURL。
+            models: 段階ごとのモデル名。
+            num_ctx: コンテキスト長。Ollama の既定は短く、超えた分のプロンプトは
+            黙って切り捨てられる。
+            think: Qwen3 などの思考モード。思考トークンも max_tokens を消費するので、既定はオフ。
+            client: HTTP クライアント。None なら新しく作る。
+            timeout: 新しく作るクライアントのタイムアウト（秒）。
         """
         self._base_url = base_url.rstrip("/")
         self._models = models
@@ -58,12 +65,33 @@ class OllamaBackend:
 
     @property
     def cache_salt(self) -> str:
+        """モデル名以外で出力に影響する設定。キャッシュのキーに混ぜる。
+
+        Returns:
+            設定を表す文字列。
+        """
         return f"num_ctx={self.num_ctx};think={self.think}"
 
     def model_for(self, tier: Tier) -> str:
+        """段階に対応する実モデル名。
+
+        Args:
+            tier: モデルの段階（fast / standard / strong）。
+
+        Returns:
+            実際のモデル名。
+        """
         return self._models[tier]
 
     def _check_fits(self, request: LLMRequest) -> None:
+        """入力が num_ctx に収まるか、送る前に見積もる。
+
+        Args:
+            request: 呼び出しの内容。
+
+        Raises:
+            LLMBackendError: 入力の見積もり + max_tokens が num_ctx を超えるとき。
+        """
         chars = len(request.system) + sum(len(m.content) for m in request.messages)
         n_messages = len(request.messages) + (1 if request.system else 0)
         estimated = (
@@ -80,6 +108,17 @@ class OllamaBackend:
             )
 
     async def complete(self, request: LLMRequest) -> LLMResponse:
+        """Ollama の /api/chat を呼ぶ。
+
+        Args:
+            request: 呼び出しの内容。
+
+        Returns:
+            LLM の応答。
+
+        Raises:
+            LLMBackendError: 入力が収まらない、接続できない、エラーが返る、応答を解釈できないとき。
+        """
         self._check_fits(request)
         model = self.model_for(request.tier)
         messages = [m.model_dump() for m in request.messages]

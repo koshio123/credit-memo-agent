@@ -39,6 +39,15 @@ _DEFAULT_SYSTEM = "あなたは丁寧で正確なアシスタントです。"
 
 
 def _default_query(prompt: str, options: ClaudeAgentOptions) -> AsyncIterator[Message]:
+    """Agent SDK の query を呼ぶ。
+
+    Args:
+        prompt: 送る文面。
+        options: Agent SDK のオプション。
+
+    Returns:
+        Agent SDK のメッセージの非同期イテレータ。
+    """
     return query(prompt=prompt, options=options)
 
 
@@ -59,6 +68,16 @@ class ClaudeCodeBackend:
         think: bool = False,
         query_fn: QueryFn | None = None,
     ) -> None:
+        """Claude Code 経由のバックエンドを作る。
+
+        Args:
+            models: 段階ごとのモデルID。
+            think: 思考モードを使うか。
+            query_fn: Agent SDK の query の代わり。テストで差し替える。
+
+        Raises:
+            LLMBackendError: API 課金になる環境変数が設定されているとき。
+        """
         for var in _BILLING_ENV_VARS:
             if os.environ.get(var):
                 raise LLMBackendError(
@@ -72,12 +91,37 @@ class ClaudeCodeBackend:
 
     @property
     def cache_salt(self) -> str:
+        """モデル名以外で出力に影響する設定。キャッシュのキーに混ぜる。
+
+        Returns:
+            設定を表す文字列。
+        """
         return f"think={self._think}"
 
     def model_for(self, tier: Tier) -> str:
+        """段階に対応する実モデル名。
+
+        Args:
+            tier: モデルの段階（fast / standard / strong）。
+
+        Returns:
+            実際のモデル名。
+        """
         return self._models[tier]
 
     async def complete(self, request: LLMRequest) -> LLMResponse:
+        """単発のテキスト生成を Claude Code に頼む。
+
+        Args:
+            request: 呼び出しの内容。
+
+        Returns:
+            LLM の応答。
+
+        Raises:
+            LLMBackendError: temperature が 0 でないとき、履歴が複数ターンのとき、
+            または呼び出しに失敗したとき。
+        """
         if request.temperature > 0:
             raise LLMBackendError(
                 "claude_code バックエンドは temperature を指定できません（0 のみ）。"
@@ -104,6 +148,19 @@ class ClaudeCodeBackend:
             return await self._run(request.messages[0].content, options, model)
 
     async def _run(self, prompt: str, options: ClaudeAgentOptions, model: str) -> LLMResponse:
+        """Agent SDK を呼んで、結果メッセージを応答にする。
+
+        Args:
+            prompt: 送る文面。
+            options: Agent SDK のオプション。
+            model: 依頼したモデル名。実際に使われたモデルが分かればそちらを記録する。
+
+        Returns:
+            LLM の応答。
+
+        Raises:
+            LLMBackendError: SDK のエラー、結果が返らない、認証や利用枠の問題があったとき。
+        """
         served_model = model
         result: ResultMessage | None = None
         try:
@@ -126,6 +183,14 @@ class ClaudeCodeBackend:
 
     @staticmethod
     def _check_auth(init: dict[str, Any]) -> None:
+        """サブスクリプションのログインで動いているか確かめる。
+
+        Args:
+            init: 初期化メッセージのデータ。
+
+        Raises:
+            LLMBackendError: API キーなど、サブスクリプション以外の認証で動いているとき。
+        """
         source = init.get("apiKeySource")
         if source != "none":
             raise LLMBackendError(
@@ -135,6 +200,14 @@ class ClaudeCodeBackend:
 
     @staticmethod
     def _check_rate_limit(event: RateLimitEvent) -> None:
+        """利用枠の状態を確かめる。上限に近ければ警告を出す。
+
+        Args:
+            event: 利用枠のイベント。
+
+        Raises:
+            LLMBackendError: 利用枠の上限に達しているとき。
+        """
         info = event.rate_limit_info
         if info.status == "rejected":
             raise LLMBackendError(
@@ -150,6 +223,18 @@ class ClaudeCodeBackend:
 
     @staticmethod
     def _to_response(result: ResultMessage, model: str) -> LLMResponse:
+        """結果メッセージを応答にする。
+
+        Args:
+            result: Agent SDK の結果メッセージ。
+            model: 記録するモデル名。
+
+        Returns:
+            LLM の応答。トークン数はキャッシュの読み書き分も入力に含める。
+
+        Raises:
+            LLMBackendError: 結果がエラー、または本文が API エラーのとき。
+        """
         text = result.result or ""
         if result.is_error:
             raise LLMBackendError(

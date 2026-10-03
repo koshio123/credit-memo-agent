@@ -16,6 +16,14 @@ class IssueRecord(BaseModel):
 
     @classmethod
     def of(cls, issue: Issue) -> IssueRecord:
+        """検査の問題を、記録用の型にする。
+
+        Args:
+            issue: 検査で見つかった問題。
+
+        Returns:
+            記録用の問題。
+        """
         return cls(kind=issue.kind, severity=issue.severity, message=issue.message)
 
 

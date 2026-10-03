@@ -28,21 +28,54 @@ class CachedBackend:
     """
 
     def __init__(self, inner: LLMBackend, cache_dir: Path) -> None:
+        """キャッシュで包むバックエンドと、保存先を受け取る。
+
+        Args:
+            inner: 実際に呼び出すバックエンド。
+            cache_dir: 応答を JSON で保存するディレクトリ。
+        """
         self.inner = inner
         self._dir = cache_dir
 
     @property
     def name(self) -> str:
+        """バックエンドの名前。
+
+        Returns:
+            キャッシュのキーや応答に記録する名前。
+        """
         return self.inner.name
 
     @property
     def cache_salt(self) -> str:
+        """モデル名以外で出力に影響する設定。キャッシュのキーに混ぜる。
+
+        Returns:
+            設定を表す文字列。
+        """
         return self.inner.cache_salt
 
     def model_for(self, tier: Tier) -> str:
+        """段階に対応する実モデル名。
+
+        Args:
+            tier: モデルの段階（fast / standard / strong）。
+
+        Returns:
+            実際のモデル名。
+        """
         return self.inner.model_for(tier)
 
     async def complete(self, request: LLMRequest) -> LLMResponse:
+        """保存済みの応答があればそれを、無ければ内側のバックエンドの応答を返す。
+
+        Args:
+            request: 呼び出しの内容。
+
+        Returns:
+            LLM の応答。
+            保存済みの応答のときは cached が True。
+        """
         path = self._dir / f"{self._key(request)}.json"
         hit = self._read(path)
         if hit is not None:
@@ -54,6 +87,14 @@ class CachedBackend:
         return response
 
     def _key(self, request: LLMRequest) -> str:
+        """キャッシュのキーを作る。バックエンド名・モデル名・設定・リクエストから決まる。
+
+        Args:
+            request: 呼び出しの内容。
+
+        Returns:
+            SHA-256 の16進文字列。
+        """
         payload = {
             "backend": self.inner.name,
             "model": self.inner.model_for(request.tier),
@@ -65,10 +106,26 @@ class CachedBackend:
 
     @staticmethod
     def _is_cacheable(response: LLMResponse) -> bool:
+        """応答を保存してよいか。空の応答と、途中で切れた応答は保存しない。
+
+        Args:
+            response: LLM の応答。
+
+        Returns:
+            保存してよければ True。
+        """
         return bool(response.text.strip()) and not response.truncated
 
     @staticmethod
     def _read(path: Path) -> LLMResponse | None:
+        """保存済みの応答を読む。
+
+        Args:
+            path: キャッシュのファイル。
+
+        Returns:
+            保存済みの応答。無い、または壊れていれば None。
+        """
         if not path.exists():
             return None
         try:
@@ -82,6 +139,12 @@ class CachedBackend:
     def _write(path: Path, response: LLMResponse) -> None:
         # 書きかけのファイルを読まれないよう、他の書き手と重ならない名前の一時ファイルに
         # 書いてから置き換える
+        """応答を保存する。書けなくても例外にしない。
+
+        Args:
+            path: キャッシュのファイル。
+            response: 保存する応答。
+        """
         tmp = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
         try:
             path.parent.mkdir(parents=True, exist_ok=True)

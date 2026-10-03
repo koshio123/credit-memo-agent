@@ -6,7 +6,17 @@ from llm.types import LLMBackend
 
 
 def create_backend(settings: LLMSettings | None = None) -> LLMBackend:
-    """設定に従ってバックエンドを作る。キャッシュが有効なら包んで返す。"""
+    """設定に従ってバックエンドを作る。キャッシュが有効なら包んで返す。
+
+    Args:
+        settings: LLM の設定。None なら環境変数から読む。
+
+    Returns:
+        LLM のバックエンド。
+
+    Raises:
+        NotImplementedError: 未実装のバックエンドが選ばれたとき。
+    """
     settings = settings or LLMSettings()
 
     backend: LLMBackend

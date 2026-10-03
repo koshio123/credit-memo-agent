@@ -20,6 +20,14 @@ _JUDGEMENT = [
 
 
 def _evidence_lines(evidence: PassageEvidence | MetricEvidence) -> list[str]:
+    """証拠を、確認用の箇条書きの行にする。
+
+    Args:
+        evidence: 本文または数値の証拠。
+
+    Returns:
+        Markdown の行のリスト。
+    """
     if isinstance(evidence, PassageEvidence):
         heading = " > ".join(evidence.heading_path)
         lines = [f"  - **{evidence.id}** 本文（{heading}）"]
@@ -36,6 +44,14 @@ def _evidence_lines(evidence: PassageEvidence | MetricEvidence) -> list[str]:
 
 
 def render_review(saved: SavedResult) -> str:
+    """主張と出典を突き合わせるための確認用の Markdown を作る。
+
+    Args:
+        saved: 保存された生成結果。
+
+    Returns:
+        判定の欄つきの Markdown。
+    """
     memo = saved.memo
     warned = {f.claim.text: f for f in memo.warnings}
     lines = [

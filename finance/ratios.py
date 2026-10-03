@@ -69,6 +69,9 @@ class PeriodFinancials(BaseModel):
         一部の内訳が未計上なら0として合計する。**すべて未計上なら None**（算定できない）。
         すべて0とみなすと、抽出に失敗した会社が「無借金」の最良の評価になってしまうため。
         本当に借入のない会社は、呼び出し側が0を明示する。
+
+        Returns:
+            有利子負債の合計（円）。内訳がすべて None なら None。
         """
         parts = (
             self.short_term_borrowings,
@@ -122,6 +125,14 @@ class RatioReport(BaseModel):
 
 
 def _yen(x: Decimal) -> str:
+    """円の金額を、3桁区切りの整数で表示する。
+
+    Args:
+        x: 金額（円）。
+
+    Returns:
+        例: "1,234,567"。
+    """
     return f"{x:,.0f}"
 
 
@@ -129,6 +140,13 @@ def _show(value: Decimal, classify: Callable[[Decimal], object] | None = None) -
     """値を、小数1桁から始めて、丸めても判定（classify）が変わらない最小の桁数で表示する。
 
     29.96% を「30.0%」と丸めると、留意なのに標準と読める。判定が変わる場合は桁を増やす。
+
+    Args:
+        value: 表示する値。
+        classify: 値から判定を返す関数。None なら桁は小数1桁。
+
+    Returns:
+        3桁区切りで丸めた数値の文字列（単位は付けない）。小数8桁まで増やしても判定が変わる場合は8桁。
     """
     for digits in range(1, 9):
         rounded = value.quantize(Decimal(1).scaleb(-digits))
@@ -141,7 +159,16 @@ def _show(value: Decimal, classify: Callable[[Decimal], object] | None = None) -
 
 
 def _level_at_least(value: Decimal, standard: str, caution: str) -> Level:
-    """値が大きいほど良い指標。標準は standard 以上、留意は caution 以上。"""
+    """値が大きいほど良い指標。標準は standard 以上、留意は caution 以上。
+
+    Args:
+        value: 指標の値。
+        standard: 標準になる下限（この値以上）。Decimal の誤差を避けるため文字列で渡す。
+        caution: 留意になる下限（この値以上）。
+
+    Returns:
+        標準・留意・要精査のいずれか。
+    """
     if value >= Decimal(standard):
         return Level.STANDARD
     if value >= Decimal(caution):
@@ -150,7 +177,16 @@ def _level_at_least(value: Decimal, standard: str, caution: str) -> Level:
 
 
 def _level_at_most(value: Decimal, standard: str, caution: str) -> Level:
-    """値が小さいほど良い指標。標準は standard 以下、留意は caution 以下。"""
+    """値が小さいほど良い指標。標準は standard 以下、留意は caution 以下。
+
+    Args:
+        value: 指標の値。
+        standard: 標準になる上限（この値以下）。Decimal の誤差を避けるため文字列で渡す。
+        caution: 留意になる上限（この値以下）。
+
+    Returns:
+        標準・留意・要精査のいずれか。
+    """
     if value <= Decimal(standard):
         return Level.STANDARD
     if value <= Decimal(caution):
@@ -159,15 +195,40 @@ def _level_at_most(value: Decimal, standard: str, caution: str) -> Level:
 
 
 def _at_least(standard: str, caution: str) -> Callable[[Decimal], Level]:
+    """_level_at_least の基準値を固定した判定関数を作る。
+
+    Args:
+        standard: 標準になる下限。
+        caution: 留意になる下限。
+
+    Returns:
+        値から水準を返す関数。
+    """
     return lambda v: _level_at_least(v, standard, caution)
 
 
 def _at_most(standard: str, caution: str) -> Callable[[Decimal], Level]:
+    """_level_at_most の基準値を固定した判定関数を作る。
+
+    Args:
+        standard: 標準になる上限。
+        caution: 留意になる上限。
+
+    Returns:
+        値から水準を返す関数。
+    """
     return lambda v: _level_at_most(v, standard, caution)
 
 
 def _is_sales_drop(growth_pct: Decimal) -> bool:
-    """第11条: 売上高成長率が－10%以下。"""
+    """第11条: 売上高成長率が－10%以下。
+
+    Args:
+        growth_pct: 売上高成長率（%）。
+
+    Returns:
+        －10%以下なら True。
+    """
     return growth_pct <= Decimal(-10)
 
 
@@ -175,12 +236,32 @@ def _is_sales_drop(growth_pct: Decimal) -> bool:
 
 
 def _missing(items: dict[str, Decimal | None]) -> list[str]:
+    """値が None の項目の名前を集める。
+
+    Args:
+        items: 項目名から値への対応。
+
+    Returns:
+        値が None の項目名のリスト。
+    """
     return [label for label, v in items.items() if v is None]
 
 
 def _unmeasurable(
     name: str, unit: str, reason: str, basis: str = "", level: Level | None = None
 ) -> RatioResult:
+    """算定不能の結果を組み立てる。
+
+    Args:
+        name: 指標の名前。
+        unit: 単位。
+        reason: 算定できない理由。
+        basis: 計算根拠。空なら理由から作る。
+        level: 算定不能でも水準を与える場合の水準。
+
+    Returns:
+        value が None の算定結果。
+    """
     return RatioResult(
         name=name,
         unit=unit,
@@ -192,6 +273,16 @@ def _unmeasurable(
 
 
 def _no_input(name: str, unit: str, labels: list[str]) -> RatioResult:
+    """入力項目がないために算定できない結果を組み立てる。
+
+    Args:
+        name: 指標の名前。
+        unit: 単位。
+        labels: 見つからなかった項目名。
+
+    Returns:
+        value が None の算定結果。
+    """
     return _unmeasurable(name, unit, "入力なし: " + "、".join(labels))
 
 
@@ -199,6 +290,14 @@ def _no_input(name: str, unit: str, labels: list[str]) -> RatioResult:
 
 
 def _equity_ratio(f: PeriodFinancials) -> RatioResult:
+    """自己資本比率 = 純資産 ÷ 総資産。
+
+    Args:
+        f: 当期の連結財務データ。
+
+    Returns:
+        算定結果（値・水準・計算根拠）。算定できないときは value が None。
+    """
     name, unit = "自己資本比率", "%"
     if f.net_assets is None or f.total_assets is None:
         return _no_input(name, unit, _missing({"純資産": f.net_assets, "総資産": f.total_assets}))
@@ -219,6 +318,14 @@ def _equity_ratio(f: PeriodFinancials) -> RatioResult:
 
 
 def _current_ratio(f: PeriodFinancials) -> RatioResult:
+    """流動比率 = 流動資産 ÷ 流動負債。
+
+    Args:
+        f: 当期の連結財務データ。
+
+    Returns:
+        算定結果（値・水準・計算根拠）。算定できないときは value が None。
+    """
     name, unit = "流動比率", "%"
     if f.current_assets is None or f.current_liabilities is None:
         gaps = _missing({"流動資産": f.current_assets, "流動負債": f.current_liabilities})
@@ -240,6 +347,14 @@ def _current_ratio(f: PeriodFinancials) -> RatioResult:
 
 
 def _operating_margin(f: PeriodFinancials) -> RatioResult:
+    """営業利益率 = 営業利益 ÷ 売上高。
+
+    Args:
+        f: 当期の連結財務データ。
+
+    Returns:
+        算定結果（値・水準・計算根拠）。算定できないときは value が None。
+    """
     name, unit = "営業利益率", "%"
     if f.operating_income is None or f.net_sales is None:
         return _no_input(
@@ -262,6 +377,14 @@ def _operating_margin(f: PeriodFinancials) -> RatioResult:
 
 
 def _interest_coverage(f: PeriodFinancials) -> RatioResult:
+    """インタレスト・カバレッジ・レシオ = （営業利益 ＋ 受取利息 ＋ 受取配当金）÷ 支払利息。
+
+    Args:
+        f: 当期の連結財務データ。
+
+    Returns:
+        算定結果（値・水準・計算根拠）。算定できないときは value が None。
+    """
     name, unit = "インタレスト・カバレッジ・レシオ", "倍"
     # 受取利息・受取配当金が無い会社は、XBRL にその項目が出ない。営業外収益が無いだけなので0とする
     if f.operating_income is None:
@@ -297,6 +420,17 @@ def _interest_coverage(f: PeriodFinancials) -> RatioResult:
 
 
 def _debt_repayment_years(f: PeriodFinancials) -> RatioResult:
+    """債務償還年数 = 要償還債務 ÷ 償還原資。
+
+    要償還債務は有利子負債 － 正常運転資金、償還原資は親会社株主に帰属する当期純利益 ＋ 減価償却費。
+    要償還債務がゼロ以下なら0年。
+
+    Args:
+        f: 当期の連結財務データ。
+
+    Returns:
+        算定結果（値・水準・計算根拠）。算定できないときは value が None。
+    """
     name, unit = "債務償還年数", "年"
     if f.trade_receivables is None or f.inventories is None or f.trade_payables is None:
         gaps = _missing(
@@ -365,6 +499,15 @@ def _debt_repayment_years(f: PeriodFinancials) -> RatioResult:
 
 
 def _sales_growth(current: PeriodFinancials, previous: PeriodFinancials | None) -> RatioResult:
+    """売上高成長率 = 当期売上高 ÷ 前期売上高 － 1。
+
+    Args:
+        current: 当期の連結財務データ。
+        previous: 前期の連結財務データ。None なら算定不能。
+
+    Returns:
+        算定結果。水準の区分はないので level は None。
+    """
     name, unit = "売上高成長率", "%"
     if previous is None:
         return _unmeasurable(name, unit, "前期のデータなし")
@@ -390,7 +533,14 @@ def _sales_growth(current: PeriodFinancials, previous: PeriodFinancials | None) 
 
 
 def _sales_drop(growth: RatioResult) -> FlagResult:
-    """第11条: 売上高成長率が－10%以下（前期比で10%以上の減少）。"""
+    """第11条: 売上高成長率が－10%以下（前期比で10%以上の減少）。
+
+    Args:
+        growth: 売上高成長率の算定結果。
+
+    Returns:
+        該当の判定。成長率が算定不能なら applies は None。
+    """
     name, clause = "売上高の10%以上の減少", "第11条"
     if growth.value is None:
         return FlagResult(name=name, clause=clause, applies=None, basis=growth.basis)
@@ -405,7 +555,15 @@ def _sales_drop(growth: RatioResult) -> FlagResult:
 def _consecutive_operating_loss(
     current: PeriodFinancials, previous: PeriodFinancials | None
 ) -> FlagResult:
-    """第10条: 営業損失が2期連続している。"""
+    """第10条: 営業損失が2期連続している。
+
+    Args:
+        current: 当期の連結財務データ。
+        previous: 前期の連結財務データ。None なら判定できない。
+
+    Returns:
+        該当の判定。2期分の営業利益がそろわなければ applies は None。
+    """
     name, clause = "営業損失の2期連続", "第10条"
     if previous is None or current.operating_income is None or previous.operating_income is None:
         return FlagResult(
@@ -426,7 +584,15 @@ def _consecutive_operating_loss(
 def compute_ratios(
     current: PeriodFinancials, previous: PeriodFinancials | None = None
 ) -> RatioReport:
-    """当期（と、あれば前期）の連結財務データから、規程の財務比率と留意事項を計算する。"""
+    """当期（と、あれば前期）の連結財務データから、規程の財務比率と留意事項を計算する。
+
+    Args:
+        current: 当期の連結財務データ。
+        previous: 前期の連結財務データ。成長率と連続損失の判定に使う。
+
+    Returns:
+        各比率と留意事項の判定をまとめたレポート。
+    """
     growth = _sales_growth(current, previous)
     return RatioReport(
         equity_ratio=_equity_ratio(current),
