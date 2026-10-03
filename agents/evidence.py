@@ -74,7 +74,14 @@ _VALUE_AT_END = re.compile(r"=\s*(-?[\d,]+(?:\.\d+)?)\s*(?:%|倍|年)?\s*$")
 
 
 def format_yen(value: Decimal) -> str:
-    """金額の表記。100万円以上は百万円（四捨五入）、それ未満は円。"""
+    """金額の表記。100万円以上は百万円（四捨五入）、それ未満は円。
+
+    Args:
+        value: 金額（円）。
+
+    Returns:
+        例: "139,657百万円"、"85,000円"。
+    """
     if abs(value) >= 1_000_000:
         millions = (value / Decimal(1_000_000)).quantize(Decimal(1), rounding=ROUND_HALF_UP)
         return f"{millions:,}百万円"
@@ -85,6 +92,12 @@ def debt_due_within_1y(f: PeriodFinancials) -> tuple[Decimal | None, str]:
     """1年以内に返済する有利子負債の割合（%）と、算式・入力値（規程 第15条）。
 
     リース債務は XBRL で流動と固定が分かれていない（合算）ので、1年以内には含めない。
+
+    Args:
+        f: 1期分の連結財務データ。
+
+    Returns:
+        (割合（%）, 算式と入力値)。算定できないときは割合が None で、理由が算式の欄に入る。
     """
     total = f.interest_bearing_debt
     if total is None:
@@ -101,6 +114,14 @@ def debt_due_within_1y(f: PeriodFinancials) -> tuple[Decimal | None, str]:
 
 
 def _ratio_display(result: RatioResult) -> str:
+    """財務比率の、文章に書く表記を作る。計算根拠の末尾の数値をそのまま使う。
+
+    Args:
+        result: 財務比率の算定結果。
+
+    Returns:
+        例: "76.4%"。算定不能なら "算定不能"。
+    """
     if result.value is None:
         return "算定不能"
     match = _VALUE_AT_END.search(result.basis)
@@ -109,6 +130,14 @@ def _ratio_display(result: RatioResult) -> str:
 
 
 def _flag_display(flag: FlagResult) -> str:
+    """留意事項の判定の表記を作る。
+
+    Args:
+        flag: 留意事項の判定。
+
+    Returns:
+        "該当"、"非該当"、"判定不能" のいずれか。
+    """
     if flag.applies is None:
         return "判定不能"
     return "該当" if flag.applies else "非該当"
@@ -117,6 +146,15 @@ def _flag_display(flag: FlagResult) -> str:
 def _inputs(
     fields: Sequence[str], financials: FinancialsResult
 ) -> tuple[dict[str, str], list[int]]:
+    """算式の入力項目について、XBRL の項目名と PDF のページを集める。
+
+    Args:
+        fields: 入力項目の名前（PeriodFinancials の項目名）。
+        financials: 財務データの取得結果。
+
+    Returns:
+        (入力項目 -> XBRL の項目名, 入力値が載っている PDF のページ（昇順）)。
+    """
     xbrl = {f: financials.provenance[f] for f in fields if f in financials.provenance}
     pages = sorted({financials.pdf_pages[f] for f in fields if f in financials.pdf_pages})
     return xbrl, pages
@@ -128,6 +166,14 @@ def collect_metrics(
     """財務比率・規程の留意事項・主要な金額の証拠を、当期と前期について作る。
 
     キーは「項目.期」（例: equity_ratio.current）。
+
+    Args:
+        service: EDINET のサービス層。
+        sec_code: 証券コード。
+        pool: 証拠を追加する集まり。
+
+    Returns:
+        「項目.期」から数値の証拠への対応。
     """
     periods: tuple[Period, Period] = ("current", "previous")
     financials = {p: service.get_financials(sec_code, p) for p in periods}
@@ -135,6 +181,12 @@ def collect_metrics(
     out: dict[str, MetricEvidence] = {}
 
     def add(key: str, evidence: MetricEvidence) -> None:
+        """証拠を集まりに追加し、キーに結びつけて記録する。
+
+        Args:
+            key: 「項目.期」のキー。
+            evidence: 追加する証拠。
+        """
         out[key] = pool.add(evidence)
 
     for period in periods:
@@ -268,7 +320,18 @@ def collect_passages(
     pool: EvidencePool,
     k: int = 5,
 ) -> dict[str, list[PassageEvidence]]:
-    """問いごとに検索し、本文の証拠を作る。同じ箇所が複数の問いで見つかっても、証拠は 1 つ。"""
+    """問いごとに検索し、本文の証拠を作る。同じ箇所が複数の問いで見つかっても、証拠は 1 つ。
+
+    Args:
+        service: EDINET のサービス層。
+        sec_code: 証券コード。
+        queries: 検索の問い。
+        pool: 証拠を追加する集まり。
+        k: 問いごとに取る件数。
+
+    Returns:
+        問いから、見つかった本文の証拠（上位から）への対応。
+    """
     result: dict[str, list[PassageEvidence]] = {}
     for query in queries:
         evidences: list[PassageEvidence] = []

@@ -47,15 +47,41 @@ class LLMBackend(Protocol):
     """LLMの呼び出し先。実装は llm/local.py など。"""
 
     @property
-    def name(self) -> str: ...
+    def name(self) -> str:
+        """バックエンドの名前。
+
+        Returns:
+            キャッシュのキーや応答に記録する名前。
+        """
+        ...
 
     @property
     def cache_salt(self) -> str:
-        """モデル名以外で出力に影響する設定（コンテキスト長など）。キャッシュのキーに混ぜる。"""
+        """モデル名以外で出力に影響する設定（コンテキスト長など）。キャッシュのキーに混ぜる。
+
+        Returns:
+            設定を表す文字列。
+        """
         ...
 
     def model_for(self, tier: Tier) -> str:
-        """段階に対応する実モデル名。キャッシュのキーにも使う。"""
+        """段階に対応する実モデル名。キャッシュのキーにも使う。
+
+        Args:
+            tier: モデルの段階（fast / standard / strong）。
+
+        Returns:
+            実際のモデル名。
+        """
         ...
 
-    async def complete(self, request: LLMRequest) -> LLMResponse: ...
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        """LLM を1回呼ぶ。
+
+        Args:
+            request: 呼び出しの内容。
+
+        Returns:
+            LLM の応答。
+        """
+        ...

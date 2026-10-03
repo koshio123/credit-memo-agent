@@ -30,6 +30,11 @@ TEXT_CACHE = Path("data/pdf_text")
 
 
 def main() -> int:
+    """対象の書類をチャンクに分け、埋め込んで DB に保存する。
+
+    Returns:
+        終了コード。正常終了は 0。
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--dataset", nargs="+", choices=sorted(DATASETS), default=["dev", "heldout"]

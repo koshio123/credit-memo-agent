@@ -44,7 +44,14 @@ class GoingConcernResult:
 
 
 def _flatten(text: str) -> tuple[str, list[int]]:
-    """改行を取り除いた本文と、各文字の元の位置。"""
+    """改行を取り除いた本文と、各文字の元の位置を返す。
+
+    Args:
+        text: ページの本文。
+
+    Returns:
+        (改行を除いた本文, 各文字の元の本文での位置)。
+    """
     chars: list[str] = []
     origin: list[int] = []
     for i, ch in enumerate(text):
@@ -55,14 +62,32 @@ def _flatten(text: str) -> tuple[str, list[int]]:
 
 
 def _sentence(flat: str, start: int, end: int) -> tuple[int, int]:
-    """一致箇所を含む文の範囲（句点まで）。"""
+    """一致箇所を含む文の範囲（句点まで）。
+
+    Args:
+        flat: 改行を除いた本文。
+        start: 一致の開始位置。
+        end: 一致の終了位置（含まない）。
+
+    Returns:
+        (文の開始位置, 文の終了位置（含まない）)。
+    """
     left = flat.rfind("。", 0, start) + 1
     right = flat.find("。", end)
     return left, (len(flat) if right < 0 else right + 1)
 
 
 def _heading_spans(doc_id: str, page_number: int, text: str) -> list[SourceSpan]:
-    """見出しの行の後に、「該当事項はありません」以外の内容があれば、見出しから最初の文末まで。"""
+    """見出しの行の後に、「該当事項はありません」以外の内容があれば、見出しから最初の文末まで。
+
+    Args:
+        doc_id: 書類ID。
+        page_number: ページ番号（1始まり）。
+        text: ページの本文。
+
+    Returns:
+        記載ありと見なす箇所の出典スパン。
+    """
     spans: list[SourceSpan] = []
     for pattern in _HEADING_LINES:
         for match in pattern.finditer(text):
@@ -87,6 +112,15 @@ def _heading_spans(doc_id: str, page_number: int, text: str) -> list[SourceSpan]
 
 
 def check_going_concern(doc_id: str, pages: Sequence[str]) -> GoingConcernResult:
+    """継続企業の前提に関する記載を、語句で探す（第13条）。
+
+    Args:
+        doc_id: 書類ID。
+        pages: ページごとの本文。
+
+    Returns:
+        記載の有無と、見つかった箇所の出典スパン。
+    """
     spans: list[SourceSpan] = []
     for page_number, text in enumerate(pages, start=1):
         flat, origin = _flatten(text)
@@ -113,7 +147,14 @@ def check_going_concern(doc_id: str, pages: Sequence[str]) -> GoingConcernResult
 
 
 def _drop_nested(spans: list[SourceSpan]) -> list[SourceSpan]:
-    """他のスパンに含まれるスパンを除く（同じ文を重複して引用しない）。"""
+    """他のスパンに含まれるスパンを除く（同じ文を重複して引用しない）。
+
+    Args:
+        spans: 出典スパン。
+
+    Returns:
+        重複と包含を除いたスパン（元の順）。
+    """
     kept: list[SourceSpan] = []
     for span in spans:
         inside = any(
@@ -155,7 +196,17 @@ def build_policy_rows(
     doc_id: str,
     going_concern: GoingConcernResult,
 ) -> list[PolicyRow]:
-    """内規照合の表の行。結果は転記と規則の判定だけで、評価や結論は含まない。"""
+    """内規照合の表の行。結果は転記と規則の判定だけで、評価や結論は含まない。
+
+    Args:
+        metrics: 「項目.期」から数値の証拠への対応。
+        pool: 証拠の集まり。第13条の証拠をここに追加する。
+        doc_id: 書類ID。
+        going_concern: 継続企業の前提に関する記載の検索結果。
+
+    Returns:
+        第8〜11条・第13条の照合の行。
+    """
     rows: list[PolicyRow] = []
     scrutiny: list[MetricEvidence] = []
     for name in _LEVEL_RATIOS:
@@ -182,6 +233,16 @@ def build_policy_rows(
 
 
 def _going_concern_row(pool: EvidencePool, doc_id: str, result: GoingConcernResult) -> PolicyRow:
+    """第13条の行を作る。記載があれば本文の証拠を、無ければ検索の記録を、証拠に加える。
+
+    Args:
+        pool: 証拠を追加する集まり。
+        doc_id: 書類ID。
+        result: 継続企業の前提に関する記載の検索結果。
+
+    Returns:
+        第13条の照合の行。
+    """
     check = "継続企業の前提に関する記載"
     if result.status == "signal_found":
         passage = pool.add(

@@ -68,15 +68,44 @@ class EdinetClient:
         http: httpx.Client | None = None,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
+        """EDINET のクライアントを作る。
+
+        Args:
+            api_key: EDINET の API キー。ログやエラーには出さない。
+            data_dir: 取得した書類の保存先。
+            http: HTTP クライアント。None なら新しく作る。
+            sleep: リクエストの間隔をあける関数。テストで差し替える。
+        """
         self._key = SecretStr(api_key)
         self._dir = data_dir
         self._http = http or httpx.Client(timeout=120.0)
         self._sleep = sleep
 
     def path_for(self, doc_id: str, kind: Kind) -> Path:
+        """書類の保存先のパスを返す。
+
+        Args:
+            doc_id: 書類ID。
+            kind: 書類の種別。
+
+        Returns:
+            保存先のパス（存在するとは限らない）。
+        """
         return self._dir / doc_id / f"{doc_id}{_SPEC[kind][1]}"
 
     def download(self, doc_id: str, kind: Kind) -> FetchResult:
+        """書類を取得して保存する。取得済みなら再取得しない。
+
+        Args:
+            doc_id: 書類ID。
+            kind: 書類の種別。
+
+        Returns:
+            保存先と、今回取得したかどうか。
+
+        Raises:
+            EdinetError: 取得できない、または想定した形式でないとき。
+        """
         path = self.path_for(doc_id, kind)
         if path.exists() and path.stat().st_size > 0:
             return FetchResult(doc_id, kind, path, downloaded=False)
@@ -86,6 +115,18 @@ class EdinetClient:
         return FetchResult(doc_id, kind, path, downloaded=True)
 
     def _get(self, doc_id: str, kind: Kind) -> bytes:
+        """書類のバイト列を取得する。5xx と 429 はリトライする。
+
+        Args:
+            doc_id: 書類ID。
+            kind: 書類の種別。
+
+        Returns:
+            書類の中身。先頭のバイト列は種別に合うことを確認済み。
+
+        Raises:
+            EdinetError: 取得できない、または想定した形式でないとき。
+        """
         type_param, _, magic = _SPEC[kind]
         label = kind.value.upper()
         last = "不明"
@@ -113,6 +154,12 @@ class EdinetClient:
 
     @staticmethod
     def _write_atomic(path: Path, content: bytes) -> None:
+        """一時ファイル経由で保存し、壊れたファイルを残さない。
+
+        Args:
+            path: 保存先。親のディレクトリが無ければ作る。
+            content: 書き込む中身。
+        """
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
         try:
@@ -127,7 +174,16 @@ def fetch_all(
     companies: Iterable[Company],
     kinds: Iterable[Kind] = (Kind.PDF, Kind.XBRL, Kind.CSV),
 ) -> list[FetchResult]:
-    """各社の直近期・前期の書類を取得する。1件失敗しても続け、失敗は結果に含めて返す。"""
+    """各社の直近期・前期の書類を取得する。1件失敗しても続け、失敗は結果に含めて返す。
+
+    Args:
+        client: EDINET のクライアント。
+        companies: 対象の会社。
+        kinds: 取得する書類の種別。
+
+    Returns:
+        書類ごとの取得結果。失敗したものは error にメッセージが入る。
+    """
     kinds = tuple(kinds)
     results: list[FetchResult] = []
     for company in companies:

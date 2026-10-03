@@ -25,6 +25,11 @@ class PassageEvidence(BaseModel):
 
     @property
     def text(self) -> str:
+        """本文の証拠の全文。
+
+        Returns:
+            各スパンの引用文を改行でつないだ文字列。
+        """
         return "\n".join(span.quote for span in self.spans)
 
 
@@ -51,6 +56,11 @@ class MetricEvidence(BaseModel):
 
     @property
     def text(self) -> str:
+        """数値の証拠を、検索や照合に使う1つの文字列にしたもの。
+
+        Returns:
+            指標名・表記・水準・計算根拠をつないだ文字列。
+        """
         return f"{self.label} {self.display} {self.level or ''} {self.basis}"
 
 
@@ -64,21 +74,55 @@ class EvidencePool:
         self.items: dict[str, PassageEvidence | MetricEvidence] = {}
 
     def add[T: (PassageEvidence, MetricEvidence)](self, evidence: T) -> T:
+        """証拠を追加し、E1 から順の ID を振る。
+
+        Args:
+            evidence: 追加する証拠。ID はここで上書きされる。
+
+        Returns:
+            ID を振った、保存された証拠。
+        """
         stored = evidence.model_copy(update={"id": f"E{len(self.items) + 1}"})
         self.items[stored.id] = stored
         return stored
 
     def find_passage(self, spans: list[SourceSpan]) -> PassageEvidence | None:
-        """同じ出典スパンの本文の証拠があれば返す（別の問いで同じ箇所が見つかったときに使い回す）。"""
+        """同じ出典スパンの本文の証拠があれば返す（別の問いで同じ箇所が見つかったときに使い回す）。
+
+        Args:
+            spans: 探す出典スパン。
+
+        Returns:
+            同じスパンの本文の証拠。無ければ None。
+        """
         for item in self.items.values():
             if isinstance(item, PassageEvidence) and item.spans == spans:
                 return item
         return None
 
     def get(self, evidence_id: str) -> PassageEvidence | MetricEvidence:
+        """ID で証拠を取る。
+
+        Args:
+            evidence_id: 証拠の ID（例: E1）。
+
+        Returns:
+            証拠。
+
+        Raises:
+            KeyError: その ID の証拠が無いとき。
+        """
         return self.items[evidence_id]
 
     def __contains__(self, evidence_id: object) -> bool:
+        """その ID の証拠があるか。
+
+        Args:
+            evidence_id: 証拠の ID。
+
+        Returns:
+            あれば True。
+        """
         return evidence_id in self.items
 
 

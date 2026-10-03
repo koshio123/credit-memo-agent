@@ -17,13 +17,30 @@ _RUN = re.compile(r"[^\W_]+")
 
 
 def bigrams(text: str) -> list[str]:
-    """NFKC で正規化し、文字の連なりごとに連続する2文字を取り出す。"""
+    """NFKC で正規化し、文字の連なりごとに連続する2文字を取り出す。
+
+    Args:
+        text: 2-gram に分ける文字列。
+
+    Returns:
+        出現順の2文字の語のリスト。1文字以下の連なりからは何も取れない。
+    """
     normalized = unicodedata.normalize("NFKC", text).lower()
     return [run[i : i + 2] for run in _RUN.findall(normalized) for i in range(len(run) - 1)]
 
 
 class Bm25Index:
     def __init__(self, documents: Mapping[str, str], k1: float = 1.5, b: float = 0.75) -> None:
+        """文書の集まりから転置索引を作る。
+
+        Args:
+            documents: 文書ID から本文への対応。
+            k1: 語の出現回数が効く度合い。正の値。
+            b: 文書の長さによる補正の強さ。0 以上 1 以下。
+
+        Raises:
+            ValueError: k1 が正でない、または b が 0〜1 の範囲外のとき。
+        """
         if k1 <= 0:
             raise ValueError("k1 は正の値にする")
         if not 0 <= b <= 1:
@@ -41,15 +58,30 @@ class Bm25Index:
         self._avg_length = total / len(self._lengths) if self._lengths else 0.0
 
     def _idf(self, document_frequency: int) -> float:
+        """少ない文書にしか出ない語ほど大きくなる重み（IDF）を計算する。
+
+        Args:
+            document_frequency: その語を含む文書の数。
+
+        Returns:
+            その語の IDF。常に正。
+        """
         n = len(self._lengths)
         return math.log(1 + (n - document_frequency + 0.5) / (document_frequency + 0.5))
 
     def search(
         self, query: str, k: int, restrict: Iterable[str] | None = None
     ) -> list[tuple[str, float]]:
-        """スコアの高い順に (文書ID, スコア) を返す。共通の2文字が無い文書は返さない。
+        """質問文に合う文書を BM25 のスコアが高い順に探す。
 
-        restrict を渡すと、その文書だけを対象にする。IDF などの統計は索引全体のまま。
+        Args:
+            query: 質問文。
+            k: 返す件数の上限。
+            restrict: 渡すと、その文書IDだけを対象にする。IDF などの統計は索引全体のまま。
+
+        Returns:
+            (文書ID, スコア) をスコアの高い順に並べたリスト。同点は文書IDの昇順。
+            質問と共通の2文字が無い文書は含めない。
         """
         allowed = set(restrict) if restrict is not None else None
         scores: dict[str, float] = {}

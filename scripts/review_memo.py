@@ -20,12 +20,25 @@ log = logging.getLogger("review_memo")
 
 
 def review(path: Path) -> Path:
+    """保存した結果から、主張と出典の突き合わせの Markdown を作って保存する。
+
+    Args:
+        path: 生成結果の JSON のパス。
+
+    Returns:
+        書き出した Markdown のパス。
+    """
     out = path.with_suffix(".review.md")
     out.write_text(render_review(load_result(path)), encoding="utf-8")
     return out
 
 
 def main() -> int:
+    """生成結果の JSON ごとに、確認用の Markdown を作る。
+
+    Returns:
+        終了コード。成功は 0、読めない JSON があれば 1。
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("json_path", nargs="+", type=Path)
     args = parser.parse_args()

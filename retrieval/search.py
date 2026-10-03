@@ -40,15 +40,35 @@ class LexicalIndex:
     """
 
     def __init__(self, store: ChunkStore) -> None:
+        """索引の元になるストアを受け取る。索引は最初の検索で作る。
+
+        Args:
+            store: チャンクの保存先。
+        """
         self._store = store
         self._snapshot: _Snapshot | None = None
         self._lock = threading.Lock()
 
     @property
     def index(self) -> Bm25Index:
+        """最新のチャンクから作った BM25 の索引。
+
+        Returns:
+            BM25 の索引。
+        """
         return self._current().index
 
     def search(self, query: str, k: int, doc_ids: Sequence[str] | None) -> list[Hit]:
+        """BM25 で検索する。
+
+        Args:
+            query: 質問文。
+            k: 返す件数の上限。
+            doc_ids: 対象にする書類ID。None なら全書類。
+
+        Returns:
+            順位つきの検索結果（スコアの高い順）。
+        """
         snap = self._current()
         restrict = None
         if doc_ids is not None:
@@ -60,6 +80,11 @@ class LexicalIndex:
         ]
 
     def _current(self) -> _Snapshot:
+        """チャンクが変わっていなければ今の索引を、変わっていれば作り直した索引を返す。
+
+        Returns:
+            最新の索引とチャンクの組。
+        """
         with self._lock:
             fingerprint = self._store.corpus_fingerprint()
             snap = self._snapshot
@@ -86,6 +111,13 @@ class Retriever:
         embedder: Embedder,
         lexical_index: LexicalIndex | None = None,
     ) -> None:
+        """検索の入口を作る。
+
+        Args:
+            store: チャンクの保存先。
+            embedder: ベクトル検索で質問を埋め込むモデル。
+            lexical_index: 共有する語句の索引。None なら新しく作る。
+        """
         self._store = store
         self._embedder = embedder
         self._lexical = lexical_index or LexicalIndex(store)
@@ -97,6 +129,20 @@ class Retriever:
         mode: Mode = "hybrid",
         doc_ids: Sequence[str] | None = None,
     ) -> list[Hit]:
+        """チャンクを検索する。
+
+        Args:
+            query: 質問文。NFKC で正規化してから検索する。
+            k: 返す件数の上限。
+            mode: 検索方式（bm25 / vector / hybrid）。
+            doc_ids: 対象にする書類ID。None なら全書類。
+
+        Returns:
+            順位つきの検索結果（上位から）。
+
+        Raises:
+            ValueError: 知らない検索モードのとき。
+        """
         query = unicodedata.normalize("NFKC", query)
         if mode == "bm25":
             return self._lexical.search(query, k, doc_ids)
@@ -115,9 +161,26 @@ class Retriever:
         raise ValueError(f"知らない検索モードです: {mode}")
 
     def is_indexed(self, doc_id: str) -> bool:
-        """この書類を、このインスタンスの埋め込みモデルで検索できるか（埋め込みが保存されているか）。"""
+        """この書類を、このインスタンスの埋め込みモデルで検索できるか（埋め込みが保存されているか）。
+
+        Args:
+            doc_id: 書類ID。
+
+        Returns:
+            埋め込みが1件以上保存されていれば True。
+        """
         return self._store.count_embeddings(self._embedder.key, doc_id) > 0
 
     def _vector(self, query: str, k: int, doc_ids: Sequence[str] | None) -> list[Hit]:
+        """ベクトル検索をする。
+
+        Args:
+            query: 質問文。
+            k: 返す件数の上限。
+            doc_ids: 対象にする書類ID。None なら全書類。
+
+        Returns:
+            コサイン類似度の高い順の検索結果。
+        """
         (vector,) = self._embedder.embed_queries([query])
         return self._store.search_vector(self._embedder.key, vector, k, doc_ids)

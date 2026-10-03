@@ -32,6 +32,11 @@ MAX_CLAUDE_COMPANIES = 3
 
 
 async def main() -> int:
+    """メモを生成する。LLM バックエンドの失敗は、理由だけを出して終わる。
+
+    Returns:
+        終了コード。成功は 0、失敗は 1、claude_code で会社が多すぎるときは 2。
+    """
     try:
         return await _main()
     except LLMBackendError as e:
@@ -42,6 +47,11 @@ async def main() -> int:
 
 
 async def _main() -> int:
+    """引数を読み、会社ごとにメモを生成して保存する。会社ごとの失敗は他の会社に影響させない。
+
+    Returns:
+        終了コード。成功は 0、失敗した会社があれば 1、claude_code で会社が多すぎるときは 2。
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sec-code", nargs="+", required=True)
     parser.add_argument("--mode", choices=["multi_agent", "baseline"], default="multi_agent")

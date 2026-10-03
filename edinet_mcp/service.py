@@ -46,10 +46,28 @@ class EdinetMcpError(Exception):
 
 
 class Searcher(Protocol):
-    def search(self, query: str, k: int, *, doc_ids: Sequence[str] | None = None) -> list[Hit]: ...
+    def search(self, query: str, k: int, *, doc_ids: Sequence[str] | None = None) -> list[Hit]:
+        """本文のチャンクを検索する。
+
+        Args:
+            query: 質問文。
+            k: 返す件数の上限。
+            doc_ids: 対象にする書類ID。None なら全書類。
+
+        Returns:
+            順位つきの検索結果。
+        """
+        ...
 
     def is_indexed(self, doc_id: str) -> bool:
-        """書類が検索の索引に入っているか。入っていないのに空の結果を返すと、記載なしと誤解される。"""
+        """書類が検索の索引に入っているか。入っていないのに空の結果を返すと、記載なしと誤解される。
+
+        Args:
+            doc_id: 書類ID。
+
+        Returns:
+            索引に入っていれば True。
+        """
         ...
 
 
@@ -62,6 +80,15 @@ class EdinetService:
         load_pages: Callable[[str], list[str]],
         pdf_items: Callable[[list[str]], dict[str, ExtractedValue]] = extract_items,
     ) -> None:
+        """サービス層を作る。
+
+        Args:
+            searcher: 本文の検索。
+            companies: 対象の会社。
+            load_facts: 書類IDから XBRL の数値の行を読む関数。
+            load_pages: 書類IDからページごとの本文を読む関数。
+            pdf_items: ページごとの本文から PDF の項目を読む関数。テストで差し替える。
+        """
         self._searcher = searcher
         self._companies = {c.sec_code: c for c in companies}
         self._load_facts = load_facts
@@ -73,6 +100,11 @@ class EdinetService:
     # ---- 会社 ----
 
     def list_companies(self) -> list[CompanyInfo]:
+        """調べられる会社の一覧。
+
+        Returns:
+            会社の情報（証券コード・会社名・業種・当期の書類ID・期末）。
+        """
         return [
             CompanyInfo(
                 sec_code=c.sec_code,
@@ -86,6 +118,17 @@ class EdinetService:
         ]
 
     def _company(self, sec_code: str) -> Company:
+        """証券コードから会社を探す。全角や5桁表記（末尾0）も受け付ける。
+
+        Args:
+            sec_code: 証券コード。
+
+        Returns:
+            会社。
+
+        Raises:
+            EdinetMcpError: 対象外の証券コードのとき。
+        """
         code = unicodedata.normalize("NFKC", sec_code).strip().upper()  # 英字入りの証券コードもある
         if len(code) == 5 and code.endswith("0"):  # 証券コードの5桁表記（末尾0）
             code = code[:4]
@@ -98,7 +141,20 @@ class EdinetService:
     # ---- 検索 ----
 
     def search_filings(self, query: str, sec_code: str, k: int = 5) -> list[Passage]:
-        """会社の当期の有価証券報告書から、質問に近い本文を探す。"""
+        """会社の当期の有価証券報告書から、質問に近い本文を探す。
+
+        Args:
+            query: 質問文。
+            sec_code: 証券コード。
+            k: 返す件数。1 以上 MAX_K 以下。
+
+        Returns:
+            出典スパンつきの本文。出典スパンを作れないものは除く。
+
+        Raises:
+            EdinetMcpError: k が範囲外、質問が空、対象外の会社、
+                または書類が索引に入っていないとき。
+        """
         if not 1 <= k <= MAX_K:
             raise EdinetMcpError(f"k は 1 から {MAX_K} までです（{k}）")
         if not query.strip():
@@ -139,13 +195,35 @@ class EdinetService:
 
     @staticmethod
     def _spans(hit: Hit, pages: list[str]) -> list[SourceSpan]:
+        """検索結果のチャンクを、出典スパンにする。
+
+        Args:
+            hit: 検索結果。
+            pages: 書類のページごとの本文。
+
+        Returns:
+            ページごとの出典スパン。
+
+        Raises:
+            EdinetMcpError: チャンクの本文をページ本文から見つけられないとき。
+        """
         try:
             return locate_chunk(hit.chunk, pages)
         except SpanNotFoundError as e:
             raise EdinetMcpError(str(e)) from e
 
     def _pages(self, doc_id: str) -> list[str]:
-        """書類のページごとの本文。一度読んだものは覚えておく。失敗は理由つきのエラーにする。"""
+        """書類のページごとの本文。一度読んだものは覚えておく。失敗は理由つきのエラーにする。
+
+        Args:
+            doc_id: 書類ID。
+
+        Returns:
+            ページごとの本文。
+
+        Raises:
+            EdinetMcpError: PDF が無い、読めない、またはページが0件のとき。
+        """
         if doc_id in self._pages_cache:
             return self._pages_cache[doc_id]
         try:
@@ -164,6 +242,17 @@ class EdinetService:
     # ---- 財務数値・比率（XBRL） ----
 
     def _facts(self, doc_id: str) -> list[Fact]:
+        """書類の XBRL の数値の行を読む。
+
+        Args:
+            doc_id: 書類ID。
+
+        Returns:
+            数値の行のリスト。
+
+        Raises:
+            EdinetMcpError: 財務データが無い、または読めないとき。
+        """
         try:
             return list(self._load_facts(doc_id))
         except FileNotFoundError as e:
@@ -177,6 +266,18 @@ class EdinetService:
             ) from e
 
     def get_financials(self, sec_code: str, period: Period = "current") -> FinancialsResult:
+        """連結の財務数値を XBRL から取る。前期の値も、当期の書類の前期の列から読む。
+
+        Args:
+            sec_code: 証券コード。
+            period: current（当期）か previous（前期）。
+
+        Returns:
+            財務数値と、項目ごとの XBRL の項目名。当期は PDF のページも付く。
+
+        Raises:
+            EdinetMcpError: period が不正、対象外の会社、または財務データを読めないとき。
+        """
         if period not in ("current", "previous"):
             raise EdinetMcpError(f"period は current か previous です（{period!r}）")
         company = self._company(sec_code)
@@ -198,7 +299,15 @@ class EdinetService:
         )
 
     def _pdf_pages(self, doc_id: str, financials: PeriodFinancials) -> dict[str, int]:
-        """PDF の基準線が、XBRL と同じ値を読んだ項目のページ。読めない・値が違う項目は含めない。"""
+        """PDF の基準線が、XBRL と同じ値を読んだ項目のページ。読めない・値が違う項目は含めない。
+
+        Args:
+            doc_id: 書類ID。
+            financials: XBRL から読んだ財務データ。
+
+        Returns:
+            項目名から PDF のページ（1始まり）への対応。失敗したときは空。
+        """
         try:
             if doc_id not in self._pdf_cache:
                 self._pdf_cache[doc_id] = self._pdf_items(self._pages(doc_id))
@@ -215,6 +324,19 @@ class EdinetService:
 
     @staticmethod
     def _extract(doc_id: str, facts: list[Fact], period: Period) -> Extraction:
+        """XBRL の数値の行から財務データを読む。失敗は理由つきのエラーにする。
+
+        Args:
+            doc_id: 書類ID。
+            facts: 数値の行。
+            period: 当期か前期か。
+
+        Returns:
+            読み取った財務データ。
+
+        Raises:
+            EdinetMcpError: IFRS の書類、または連結の行が無いとき。
+        """
         try:
             return extract(facts, period)
         except UnsupportedAccountingStandard as e:
@@ -225,7 +347,18 @@ class EdinetService:
             raise EdinetMcpError(f"書類 {doc_id}: {e}") from e
 
     def get_ratios(self, sec_code: str, period: Period = "current") -> RatiosResult:
-        """当期（前期との比較つき）または前期の財務比率。前期は前々期が無く、成長率は算定不能。"""
+        """当期（前期との比較つき）または前期の財務比率。前期は前々期が無く、成長率は算定不能。
+
+        Args:
+            sec_code: 証券コード。
+            period: current（当期）か previous（前期）。
+
+        Returns:
+            財務比率と留意事項の判定。
+
+        Raises:
+            EdinetMcpError: period が不正、対象外の会社、または財務データを読めないとき。
+        """
         if period not in ("current", "previous"):
             raise EdinetMcpError(f"period は current か previous です（{period!r}）")
         company = self._company(sec_code)
@@ -251,11 +384,32 @@ class EdinetService:
     # ---- ページ ----
 
     def all_pages(self, sec_code: str) -> list[str]:
-        """当期の有価証券報告書の全ページの本文。語句の検索など、コードが全体を調べるのに使う。"""
+        """当期の有価証券報告書の全ページの本文。語句の検索など、コードが全体を調べるのに使う。
+
+        Args:
+            sec_code: 証券コード。
+
+        Returns:
+            ページごとの本文。
+
+        Raises:
+            EdinetMcpError: 対象外の会社、または PDF を読めないとき。
+        """
         return list(self._pages(self._company(sec_code).filings.current.doc_id))
 
     def get_page(self, sec_code: str, page: int) -> PageResult:
-        """当期の有価証券報告書の1ページ分の本文（1 始まり）。検索の出典を確かめるのに使う。"""
+        """当期の有価証券報告書の1ページ分の本文（1 始まり）。検索の出典を確かめるのに使う。
+
+        Args:
+            sec_code: 証券コード。
+            page: ページ番号（1始まり）。
+
+        Returns:
+            ページの本文と、全ページ数。
+
+        Raises:
+            EdinetMcpError: ページが範囲外、対象外の会社、または PDF を読めないとき。
+        """
         company = self._company(sec_code)
         doc_id = company.filings.current.doc_id
         pages = self._pages(doc_id)

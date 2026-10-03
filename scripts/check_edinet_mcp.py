@@ -16,6 +16,11 @@ log = logging.getLogger("check_edinet_mcp")
 
 
 async def main() -> int:
+    """MCP サーバーを子プロセスで起動し、各ツールを一通り呼んで確かめる。
+
+    Returns:
+        終了コード。正常終了は 0。
+    """
     params = StdioServerParameters(command=sys.executable, args=["-m", "edinet_mcp"])
     async with Client(params) as client:
         tools = (await client.list_tools()).tools

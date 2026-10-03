@@ -39,6 +39,13 @@ def _same(a: Decimal | None, b: Decimal | None) -> bool:
 
     片方の書類でだけ「－」（0）と載り、もう片方には行が無いことがある。
     ゼロでない値と「行なし」、値の違いは、訂正再表示の疑いとして食い違いにする。
+
+    Args:
+        a: 一方の値。
+        b: もう一方の値。
+
+    Returns:
+        同じとみなせれば True。
     """
     if a == b:
         return True
@@ -46,12 +53,31 @@ def _same(a: Decimal | None, b: Decimal | None) -> bool:
 
 
 def _csv_zip(data_dir: Path, doc_id: str) -> Path:
+    """財務データ CSV の zip のパスを返す。
+
+    Args:
+        data_dir: EDINET の書類を置いたディレクトリ。
+        doc_id: 書類ID。
+
+    Returns:
+        zip のパス。
+    """
     return data_dir / doc_id / f"{doc_id}.csv.zip"
 
 
 def _period(
     period_end: str, extraction: Extraction, previous: PeriodFinancials | None
 ) -> PeriodGroundTruth:
+    """1期分の正解データを組み立てる。
+
+    Args:
+        period_end: 期末。
+        extraction: XBRL から読んだ財務データ。
+        previous: 比率の計算に使う前期の財務データ。無ければ None。
+
+    Returns:
+        財務データと、それから計算した比率を含む正解データ。
+    """
     return PeriodGroundTruth(
         period_end=period_end,
         financials=extraction.financials,
@@ -61,7 +87,20 @@ def _period(
 
 
 def build_company_ground_truth(company: Company, data_dir: Path) -> CompanyGroundTruth:
-    """IFRS の書類は UnsupportedAccountingStandard で失敗する（黙って空にしない）。"""
+    """会社の正解データ（前期・当期）を XBRL から作る。
+
+    当期の書類の前期列と、前期の書類の当期列を突き合わせ、食い違いを記録する。
+
+    Args:
+        company: 会社。
+        data_dir: EDINET の書類を置いたディレクトリ。
+
+    Returns:
+        前期・当期の正解データと、訂正再表示の疑いのある項目。
+
+    Raises:
+        UnsupportedAccountingStandard: IFRS の書類のとき（黙って空にしない）。
+    """
     cur_facts = read_facts(_csv_zip(data_dir, company.filings.current.doc_id))
     prev_facts = read_facts(_csv_zip(data_dir, company.filings.previous.doc_id))
 

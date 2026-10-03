@@ -32,6 +32,12 @@ PROMPT = (
 
 
 async def main() -> int:
+    """Claude Code のエージェントが MCP のツールを呼べるか確かめる。
+
+    Returns:
+        終了コード。ツールが呼ばれれば 0、呼ばれない、または認証がサブスクリプションでなければ
+        1。
+    """
     options = ClaudeAgentOptions(
         system_prompt="あなたは与信メモの下書きを手伝うアシスタントです。融資の可否は判断しません。",
         model="haiku",

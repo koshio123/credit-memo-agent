@@ -20,6 +20,11 @@ OUT = Path("data/ground_truth/ground_truth.json")
 
 
 def main() -> int:
+    """全社の正解データを作って JSON に書き出す。
+
+    Returns:
+        終了コード。正常終了は 0。
+    """
     truths = [build_company_ground_truth(c, DATA_DIR) for c in load_companies()]
     OUT.parent.mkdir(parents=True, exist_ok=True)
     payload = {"companies": [t.model_dump(mode="json") for t in truths]}

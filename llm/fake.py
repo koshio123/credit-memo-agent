@@ -20,15 +20,42 @@ class ScriptedBackend:
         models: dict[Tier, str] | None = None,
         salt: str = "",
     ) -> None:
+        """あらかじめ決めた応答を返すバックエンドを作る。
+
+        Args:
+            script: 順に返す応答。文字列は本文、LLMResponse はそのまま、例外は送出する。
+            models: 段階ごとのモデル名。省略した段階は "fake"。
+            salt: キャッシュのキーに混ぜる文字列。
+        """
         self.cache_salt = salt
         self._script = deque(script)
         self._models = {**_DEFAULT_MODELS, **(models or {})}
         self.requests: list[LLMRequest] = []
 
     def model_for(self, tier: Tier) -> str:
+        """段階に対応する実モデル名。
+
+        Args:
+            tier: モデルの段階（fast / standard / strong）。
+
+        Returns:
+            実際のモデル名。
+        """
         return self._models[tier]
 
     async def complete(self, request: LLMRequest) -> LLMResponse:
+        """リクエストを記録し、次の応答を返す。
+
+        Args:
+            request: 呼び出しの内容。
+
+        Returns:
+            LLM の応答。
+
+        Raises:
+            AssertionError: 用意した応答を使い切ったとき。
+            LLMBackendError: 次の項目が例外のとき（その例外）。
+        """
         self.requests.append(request)
         if not self._script:
             raise AssertionError("ScriptedBackend: 用意した応答を使い切りました")

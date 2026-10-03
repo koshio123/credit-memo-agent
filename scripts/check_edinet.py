@@ -25,6 +25,16 @@ DEFAULT_DATE = "2026-09-29"
 
 
 def run(key: str, date: str, client: httpx.Client) -> int:
+    """EDINET の書類一覧 API を1回呼び、キーが使えるか確かめる。キーは出力に出さない。
+
+    Args:
+        key: EDINET の API キー。
+        date: 提出日（YYYY-MM-DD）。
+        client: HTTP クライアント。
+
+    Returns:
+        終了コード。成功は 0、失敗は 1。
+    """
     try:
         # type=1 は書類の一覧（メタデータ）のみ。書類の本体は取得しない
         res = client.get(
@@ -58,6 +68,11 @@ def run(key: str, date: str, client: httpx.Client) -> int:
 
 
 def main() -> int:
+    """設定のキーで EDINET に接続できるか確かめる。
+
+    Returns:
+        終了コード。成功は 0、キー未設定や接続の失敗は 1。
+    """
     key = EdinetSettings().edinet_api_key.get_secret_value()
     if not key:
         log.error("EDINET_API_KEY が .env に設定されていません")

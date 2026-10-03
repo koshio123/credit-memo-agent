@@ -39,6 +39,15 @@ class Plan:
 
 
 def _clean(queries: list[str], limit: int) -> list[str]:
+    """問いの空白を整え、空・長すぎるもの・重複を除いて、上限で切る。
+
+    Args:
+        queries: 問いのリスト。
+        limit: 残す件数の上限。
+
+    Returns:
+        整えた問い（元の順）。
+    """
     seen: list[str] = []
     for query in queries:
         text = " ".join(query.split())
@@ -48,10 +57,28 @@ def _clean(queries: list[str], limit: int) -> list[str]:
 
 
 def default_plan() -> Plan:
+    """既定の問いによる計画を返す。
+
+    Returns:
+        used_default が True の計画。
+    """
     return Plan(list(DEFAULT_OVERVIEW_QUERIES), list(DEFAULT_RISK_QUERIES), used_default=True)
 
 
 async def make_plan(ctx: Context, company: str, industry: str, summary: str) -> Plan:
+    """会社の業種と財務指標の特徴から、有報で調べる問いを決める。
+
+    必須の問いは、LLM の出力にかかわらず加える。出力が使えないときは既定の計画にする。
+
+    Args:
+        ctx: ワーカー共通の文脈。
+        company: 会社名。
+        industry: 業種。
+        summary: 財務指標の概要。
+
+    Returns:
+        企業概要とリスクの問いの計画。
+    """
     request = LLMRequest(
         system=SYSTEM,
         messages=[

@@ -64,6 +64,14 @@ class MemoResult:
 
 
 def _unique(evidence: Sequence[PassageEvidence]) -> list[PassageEvidence]:
+    """証拠のIDで重複を除く。
+
+    Args:
+        evidence: 本文の証拠。
+
+    Returns:
+        最初に現れた順の、重複のない証拠。
+    """
     seen: dict[str, PassageEvidence] = {}
     for item in evidence:
         seen.setdefault(item.id, item)
@@ -74,6 +82,14 @@ _SUMMARY_KEYS = (*LEVEL_RATIOS, "sales_growth")  # Planner に見せる財務指
 
 
 def _summary(metrics: dict[str, MetricEvidence]) -> str:
+    """Planner に見せる、直近期の財務指標の概要を作る。
+
+    Args:
+        metrics: 「項目.期」から数値の証拠への対応。
+
+    Returns:
+        1指標1行の箇条書き（水準があれば付ける）。
+    """
     lines = [
         f"- {m.label}: {m.display}" + (f"（{m.level}）" if m.level else "")
         for key, m in metrics.items()
@@ -83,6 +99,18 @@ def _summary(metrics: dict[str, MetricEvidence]) -> str:
 
 
 def _company_info(service: EdinetService, sec_code: str) -> CompanyInfo:
+    """証券コードから対象会社の情報を探す。
+
+    Args:
+        service: EDINET のサービス層。
+        sec_code: 証券コード。
+
+    Returns:
+        会社の情報。
+
+    Raises:
+        EdinetMcpError: 対象外の証券コードのとき。
+    """
     for info in service.list_companies():
         if info.sec_code == sec_code.strip():
             return info
@@ -90,6 +118,14 @@ def _company_info(service: EdinetService, sec_code: str) -> CompanyInfo:
 
 
 def _new_memo(info: CompanyInfo) -> MemoDraft:
+    """会社の情報から、空のメモを作る。
+
+    Args:
+        info: 会社の情報。
+
+    Returns:
+        主張が空のメモの下書き。
+    """
     return MemoDraft(
         sec_code=info.sec_code,
         company=info.name,
@@ -105,6 +141,17 @@ def _finish_policy(
     pool: EvidencePool,
     metrics: dict[str, MetricEvidence],
 ) -> GoingConcernResult:
+    """継続企業の前提を調べ、内規照合の表をメモに入れる。
+
+    Args:
+        memo: 下書きのメモ。policy_rows と going_concern_signal を更新する。
+        service: EDINET のサービス層。
+        pool: 証拠の集まり。
+        metrics: 「項目.期」から数値の証拠への対応。
+
+    Returns:
+        継続企業の前提に関する記載の検索結果。
+    """
     going_concern = check_going_concern(memo.doc_id, service.all_pages(memo.sec_code))
     memo.policy_rows = build_policy_rows(metrics, pool, memo.doc_id, going_concern)
     memo.going_concern_signal = going_concern.status == "signal_found"
@@ -112,15 +159,40 @@ def _finish_policy(
 
 
 def _financial_evidence(metrics: dict[str, MetricEvidence]) -> list[MetricEvidence]:
+    """財務の所見に渡す数値の証拠を選ぶ。
+
+    Args:
+        metrics: 「項目.期」から数値の証拠への対応。
+
+    Returns:
+        内規照合の記録などを除いた数値の証拠。
+    """
     return [m for key, m in metrics.items() if key.split(".")[0] in _FINANCIAL_PREFIXES]
 
 
 def _evidence_ids(claims: Sequence[Claim]) -> set[str]:
+    """主張が引用する証拠のIDを集める。
+
+    Args:
+        claims: 主張。
+
+    Returns:
+        引用された証拠のIDの集合。
+    """
     return {e for c in claims for e in c.evidence_ids}
 
 
 async def run_baseline(service: EdinetService, backend: LLMBackend, sec_code: str) -> MemoResult:
-    """単一エージェント: 固定の問いで集めた証拠を、1 回の呼び出しで全部の節に書かせる。"""
+    """単一エージェント: 固定の問いで集めた証拠を、1 回の呼び出しで全部の節に書かせる。
+
+    Args:
+        service: EDINET のサービス層。
+        backend: LLM のバックエンド。
+        sec_code: 証券コード。
+
+    Returns:
+        メモと証拠、LLM の使用量。
+    """
     counting = CountingBackend(backend)
     pool = EvidencePool()
     ctx = Context(counting, service, pool, sec_code)
@@ -165,7 +237,16 @@ async def run_baseline(service: EdinetService, backend: LLMBackend, sec_code: st
 
 
 async def run_multi_agent(service: EdinetService, backend: LLMBackend, sec_code: str) -> MemoResult:
-    """Planner が問いを決め、Worker が節ごとに書き、Drafter が論点と確認事項をまとめる。"""
+    """Planner が問いを決め、Worker が節ごとに書き、Drafter が論点と確認事項をまとめる。
+
+    Args:
+        service: EDINET のサービス層。
+        backend: LLM のバックエンド。
+        sec_code: 証券コード。
+
+    Returns:
+        メモと証拠、LLM の使用量。
+    """
     counting = CountingBackend(backend)
     pool = EvidencePool()
     ctx = Context(counting, service, pool, sec_code)
@@ -253,7 +334,16 @@ async def run_multi_agent(service: EdinetService, backend: LLMBackend, sec_code:
 async def _guarded(
     memo: MemoDraft, section: str, call: Coroutine[object, object, list[Claim]]
 ) -> list[Claim]:
-    """形式を満たせない出力は、その節の失敗として記録し、他の節の生成は続ける。"""
+    """形式を満たせない出力は、その節の失敗として記録し、他の節の生成は続ける。
+
+    Args:
+        memo: 失敗を記録するメモ。
+        section: 節の名前。
+        call: 主張を書かせる呼び出し。
+
+    Returns:
+        書かれた主張。失敗したときは空。
+    """
     try:
         return await call
     except StructuredOutputError as e:
@@ -262,10 +352,24 @@ async def _guarded(
 
 
 def _id_number(evidence_id: str) -> int:
+    """証拠IDの番号の部分を取り出す。
+
+    Args:
+        evidence_id: 証拠のID（例: E12）。
+
+    Returns:
+        番号（例: 12）。
+    """
     return int(evidence_id[1:])
 
 
 def _record(memo: MemoDraft, flagged: list[Flagged]) -> None:
+    """検査に引っかかった主張を、除外と警告に振り分けてメモに記録する。
+
+    Args:
+        memo: 記録先のメモ。
+        flagged: 検査に引っかかった主張。error があれば rejected、無ければ warnings に入れる。
+    """
     for item in flagged:
         if any(i.severity == "error" for i in item.issues):
             memo.rejected.append(item)
@@ -280,6 +384,18 @@ def _result(
     mode: str,
     metrics: dict[str, MetricEvidence],
 ) -> MemoResult:
+    """メモと使用量を、生成結果にまとめる。
+
+    Args:
+        memo: 下書きのメモ。
+        pool: 証拠の集まり。
+        counting: 呼び出しを数えたバックエンド。
+        mode: 構成の名前（baseline / multi_agent）。
+        metrics: 「項目.期」から数値の証拠への対応。
+
+    Returns:
+        生成結果。
+    """
     return MemoResult(
         memo=memo,
         pool=pool,

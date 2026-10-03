@@ -19,6 +19,11 @@ log = logging.getLogger("search_filings")
 
 
 def main() -> int:
+    """有価証券報告書を検索して結果を表示する。失敗は理由だけを出して終わる。
+
+    Returns:
+        終了コード。成功は 0、失敗は 1。
+    """
     try:
         return _main()
     except EdinetMcpError as e:
@@ -27,6 +32,11 @@ def main() -> int:
 
 
 def _main() -> int:
+    """引数を読み、問いごとに検索して上位の結果を表示する。
+
+    Returns:
+        終了コード。正常終了は 0。
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("sec_code")
     parser.add_argument("queries", nargs="+")

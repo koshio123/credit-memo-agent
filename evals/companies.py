@@ -61,8 +61,27 @@ class CompanyDataset(BaseModel):
 
 
 def load_companies(path: Path = DATASET_PATH) -> list[Company]:
+    """会社の一覧を JSON から読む。
+
+    Args:
+        path: 会社の一覧の JSON のパス。
+
+    Returns:
+        会社のリスト。
+    """
     return CompanyDataset.model_validate(json.loads(path.read_text(encoding="utf-8"))).companies
 
 
 def load_dataset(name: str) -> list[Company]:
+    """名前で指定した会社の組を読む。
+
+    Args:
+        name: 会社の組の名前（DATASETS のキー）。
+
+    Returns:
+        会社のリスト。
+
+    Raises:
+        KeyError: 知らない名前のとき。
+    """
     return load_companies(DATASETS[name])

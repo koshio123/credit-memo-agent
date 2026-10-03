@@ -15,10 +15,27 @@ _BASIS_CHARS = 120
 
 
 def _cell(text: str) -> str:
+    """表のセルに入れられる形にする。空白をまとめ、縦線をエスケープする。
+
+    Args:
+        text: セルの文字列。
+
+    Returns:
+        1行に収めた文字列。
+    """
     return " ".join(text.split()).replace("|", "\\|")
 
 
 def _clip(text: str, limit: int) -> str:
+    """空白をまとめ、長ければ切って「…」を付ける。
+
+    Args:
+        text: 元の文字列。
+        limit: 最大文字数。
+
+    Returns:
+        切った文字列。
+    """
     flat = " ".join(text.split())
     return flat if len(flat) <= limit else flat[:limit] + "…"
 
@@ -30,6 +47,14 @@ class _Refs:
         self.order: dict[str, int] = {}
 
     def of(self, evidence_ids: Sequence[str]) -> str:
+        """証拠のIDを、出典の番号に直す。初めて出たIDには次の番号を振る。
+
+        Args:
+            evidence_ids: 証拠のID。
+
+        Returns:
+            例: "[1][3]"。同じ番号は一度だけ。
+        """
         numbers: list[int] = []
         for evidence_id in evidence_ids:
             number = self.order.setdefault(evidence_id, len(self.order) + 1)
@@ -39,6 +64,16 @@ class _Refs:
 
 
 def _claims(claims: Sequence[Claim], refs: _Refs, warned: set[str]) -> list[str]:
+    """節の主張を、出典の番号つきの箇条書きにする。
+
+    Args:
+        claims: 節の主張。
+        refs: 出典の番号の振り分け。
+        warned: 数値の警告がある主張の本文。
+
+    Returns:
+        Markdown の行。主張が無ければ、その旨の1行。
+    """
     if not claims:
         return ["- （主張を得られなかった。資料に記載がないことを意味しない。検査の記録を参照）"]
     mark = " ⚠数値要確認"
@@ -49,11 +84,28 @@ def _claims(claims: Sequence[Claim], refs: _Refs, warned: set[str]) -> list[str]
 
 
 def _pages(item: PassageEvidence) -> str:
+    """本文の証拠のページを表記にする。
+
+    Args:
+        item: 本文の証拠。
+
+    Returns:
+        例: "p.12"、"p.12-13"。
+    """
     pages = sorted({s.page for s in item.spans})
     return f"p.{pages[0]}" if len(pages) == 1 else f"p.{pages[0]}-{pages[-1]}"
 
 
 def _source_row(number: int, item: MetricEvidence | PassageEvidence) -> str:
+    """出典一覧の1行を作る。
+
+    Args:
+        number: 出典の番号。
+        item: 本文または数値の証拠。
+
+    Returns:
+        Markdown の表の行。
+    """
     if isinstance(item, PassageEvidence):
         where = f"{item.heading_path[-1]}: " if item.heading_path else ""
         doc = item.spans[0].doc_id
@@ -75,6 +127,14 @@ def _source_row(number: int, item: MetricEvidence | PassageEvidence) -> str:
 
 
 def _header(memo: MemoDraft) -> list[str]:
+    """メモの見出しと、対象・注意書きの行を作る。
+
+    Args:
+        memo: 下書きのメモ。
+
+    Returns:
+        Markdown の行。
+    """
     return [
         "# 与信メモ（草案）",
         "",
@@ -90,6 +150,16 @@ def _header(memo: MemoDraft) -> list[str]:
 
 
 def _going_concern(memo: MemoDraft, pool: EvidencePool, refs: _Refs) -> list[str]:
+    """最優先の確認事項（継続企業の前提）の節を作る。
+
+    Args:
+        memo: 下書きのメモ。
+        pool: 証拠の集まり。
+        refs: 出典の番号の振り分け。
+
+    Returns:
+        Markdown の行。記載があれば引用を付ける。
+    """
     row = next(r for r in memo.policy_rows if r.clause == "第13条")
     cite = refs.of(row.evidence_ids)
     if memo.going_concern_signal:
@@ -108,6 +178,15 @@ def _going_concern(memo: MemoDraft, pool: EvidencePool, refs: _Refs) -> list[str
 
 
 def _metric_table(result: MemoResult, refs: _Refs) -> list[str]:
+    """主要指標の2期比較の表を作る。
+
+    Args:
+        result: 生成結果。
+        refs: 出典の番号の振り分け。
+
+    Returns:
+        Markdown の行（表と注記）。
+    """
     lines = [
         "| 指標 | 前期 | 直近期 | 規程の水準（直近期） | 計算根拠 |",
         "| --- | --- | --- | --- | --- |",
@@ -129,6 +208,15 @@ def _metric_table(result: MemoResult, refs: _Refs) -> list[str]:
 
 
 def _debt_table(result: MemoResult, refs: _Refs) -> list[str]:
+    """有利子負債の構成の表を作る。
+
+    Args:
+        result: 生成結果。
+        refs: 出典の番号の振り分け。
+
+    Returns:
+        Markdown の表の行。
+    """
     lines = ["| 項目 | 金額・割合 | 根拠 |", "| --- | --- | --- |"]
     keys = [*DEBT_LABELS, "interest_bearing_debt", "debt_due_within_1y_ratio"]
     for key in keys:
@@ -144,6 +232,15 @@ def _debt_table(result: MemoResult, refs: _Refs) -> list[str]:
 
 
 def _policy_table(memo: MemoDraft, refs: _Refs) -> list[str]:
+    """内規への照合結果の表を作る。
+
+    Args:
+        memo: 下書きのメモ。
+        refs: 出典の番号の振り分け。
+
+    Returns:
+        Markdown の表の行。
+    """
     lines = ["| 条項 | 確認内容 | 結果 | 根拠 |", "| --- | --- | --- | --- |"]
     for row in memo.policy_rows:
         lines.append(
@@ -154,6 +251,17 @@ def _policy_table(memo: MemoDraft, refs: _Refs) -> list[str]:
 
 
 def _open_items(memo: MemoDraft, result: MemoResult, refs: _Refs, warned: set[str]) -> list[str]:
+    """確認が必要な事項を作る。LLM が挙げたものに、算定不能の指標と借換えへの依存の確認を足す。
+
+    Args:
+        memo: 下書きのメモ。
+        result: 生成結果。
+        refs: 出典の番号の振り分け。
+        warned: 数値の警告がある主張の本文。
+
+    Returns:
+        Markdown の行。何も無ければ、その旨の1行。
+    """
     lines = _claims(memo.open_items, refs, warned) if memo.open_items else []
     for name in LEVEL_RATIOS:
         m = result.metrics[f"{name}.current"]
@@ -169,12 +277,28 @@ def _open_items(memo: MemoDraft, result: MemoResult, refs: _Refs, warned: set[st
 
 
 def _flag_lines(items: Sequence[Flagged]) -> list[str]:
+    """検査に引っかかった主張を、箇条書きにする。
+
+    Args:
+        items: 検査に引っかかった主張。
+
+    Returns:
+        Markdown の行。無ければ「なし」。
+    """
     return [
         f"- [{f.section}] {f.claim.text}（{'; '.join(i.message for i in f.issues)}）" for f in items
     ] or ["- なし"]
 
 
 def _inspection(memo: MemoDraft) -> list[str]:
+    """検査の記録の節を作る。
+
+    Args:
+        memo: 下書きのメモ。
+
+    Returns:
+        Markdown の行。
+    """
     empty = [
         label + ("（LLM が挙げたもの）" if key == "open_items" else "")
         for key, label in CLAIM_SECTIONS
@@ -206,6 +330,14 @@ def _inspection(memo: MemoDraft) -> list[str]:
 
 
 def render_memo(result: MemoResult) -> str:
+    """メモの下書きを、テンプレートの構成の Markdown にする。
+
+    Args:
+        result: 生成結果。
+
+    Returns:
+        Markdown の文字列。
+    """
     memo, pool = result.memo, result.pool
     refs = _Refs()
     warned = {f.claim.text for f in memo.warnings}

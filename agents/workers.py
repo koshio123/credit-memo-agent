@@ -33,6 +33,16 @@ def screen(
 
     offered は、その呼び出しで LLM に提示した証拠の ID。提示していない証拠を引用した主張は除く
     （LLM が他の節の証拠を勝手に使うのを防ぐ）。
+
+    Args:
+        claims: LLM が書いた主張。
+        pool: 証拠の集まり。
+        offered: LLM に提示した証拠の ID。
+        section: 主張の節の名前（記録用）。
+        require_evidence: False なら、出典が無いことを問題にしない。
+
+    Returns:
+        (残す主張, 検査に引っかかった主張)。後者には除いたものと、警告つきで残したものの両方が入る。
     """
     accepted: list[Claim] = []
     flagged: list[Flagged] = []
@@ -70,7 +80,21 @@ async def write_claims(
     max_claims: int = 5,
     tier: Tier = "standard",
 ) -> list[Claim]:
-    """証拠だけを渡して、出典つきの主張を書かせる。件数は上限で切る。"""
+    """証拠だけを渡して、出典つきの主張を書かせる。件数は上限で切る。
+
+    Args:
+        ctx: ワーカー共通の文脈。
+        task: 何を書かせるか。
+        evidence: LLM に渡す証拠。
+        max_claims: 主張の最大件数。
+        tier: 使うモデルの段階。
+
+    Returns:
+        書かれた主張（最大 max_claims 件）。
+
+    Raises:
+        StructuredOutputError: 出力が形式を満たさなかったとき。
+    """
     request = LLMRequest(
         system=SYSTEM,
         messages=[

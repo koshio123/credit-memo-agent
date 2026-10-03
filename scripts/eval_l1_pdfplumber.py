@@ -30,6 +30,14 @@ LABELS = {
 
 
 def pages_for(doc_id: str) -> list[str]:
+    """書類の PDF から、ページごとの本文を取り出す（キャッシュを使う）。
+
+    Args:
+        doc_id: 書類ID。
+
+    Returns:
+        ページごとの本文。
+    """
     started = time.time()
     pages = cached_pages(EDINET_DIR / doc_id / f"{doc_id}.pdf", TEXT_CACHE)
     log.info("  %s: %d ページ（%.0f 秒）", doc_id, len(pages), time.time() - started)
@@ -37,6 +45,14 @@ def pages_for(doc_id: str) -> list[str]:
 
 
 def _detail(items: dict[str, ExtractedValue]) -> dict[str, dict[str, object]]:
+    """項目ごとの抽出結果を、JSON に書ける形にする。
+
+    Args:
+        items: 項目名から抽出結果への対応。
+
+    Returns:
+        項目名から、値・節・ページ・行・理由への対応。
+    """
     return {
         k: {
             "value": None if v.value is None else str(v.value),
@@ -50,6 +66,11 @@ def _detail(items: dict[str, ExtractedValue]) -> dict[str, dict[str, object]]:
 
 
 def main() -> int:
+    """PDF の基準線を L1 で評価し、レポートと詳細を書き出す。
+
+    Returns:
+        終了コード。正常終了は 0。
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", choices=sorted(DATASETS), default="dev")
     args = parser.parse_args()

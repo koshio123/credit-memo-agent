@@ -21,7 +21,14 @@ _QUOTE_LIMIT = 500
 
 
 def render_evidence(evidence: Sequence[MetricEvidence | PassageEvidence]) -> str:
-    """証拠を、ID つきの一覧にする。"""
+    """証拠を、ID つきの一覧にする。
+
+    Args:
+        evidence: 一覧にする証拠。
+
+    Returns:
+        1証拠1行の文字列。証拠が無ければ「（証拠なし）」。
+    """
     lines: list[str] = []
     for item in evidence:
         if isinstance(item, MetricEvidence):
@@ -39,6 +46,16 @@ def render_evidence(evidence: Sequence[MetricEvidence | PassageEvidence]) -> str
 
 
 def claims_task(task: str, evidence_text: str, max_claims: int) -> str:
+    """主張を書かせる依頼文を組み立てる。
+
+    Args:
+        task: 何を書かせるか。
+        evidence_text: render_evidence で作った証拠の一覧。
+        max_claims: 主張の最大件数。
+
+    Returns:
+        LLM に送る文面。
+    """
     return (
         f"【依頼】\n{task}\n主張は最大{max_claims}件。\n\n"
         f"【証拠】\n{evidence_text}\n\n"
@@ -70,6 +87,15 @@ DRAFT_TASK = (
 
 
 def draft_prompt(prior_claims: str, evidence_text: str) -> str:
+    """論点と確認事項を書かせる依頼文を組み立てる。
+
+    Args:
+        prior_claims: これまでの主張を並べた文字列。
+        evidence_text: render_evidence で作った証拠の一覧。
+
+    Returns:
+        LLM に送る文面。
+    """
     return (
         f"【依頼】\n{DRAFT_TASK}\n\n【これまでの主張】\n{prior_claims}\n\n【証拠】\n{evidence_text}\n\n"
         '【出力の形】\n{"positives": [{"text": "…", "evidence_ids": ["E1"]}], '
@@ -79,7 +105,14 @@ def draft_prompt(prior_claims: str, evidence_text: str) -> str:
 
 
 def memo_prompt(evidence_text: str) -> str:
-    """単一エージェントのベースライン: 全部の節を 1 回で書かせる。"""
+    """単一エージェントのベースライン: 全部の節を 1 回で書かせる依頼文を組み立てる。
+
+    Args:
+        evidence_text: render_evidence で作った証拠の一覧。
+
+    Returns:
+        LLM に送る文面。
+    """
     return (
         "【依頼】\n与信メモの下書きの、次の6つの節の主張を書いてください。\n"
         "- overview（企業概要）、financial_findings（財務の所見）、business_risks（事業リスク）、"

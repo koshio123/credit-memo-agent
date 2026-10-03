@@ -17,7 +17,17 @@ class StructuredOutputError(Exception):
 
 
 def extract_json(text: str) -> str:
-    """出力から、最初の JSON（オブジェクトか配列）を取り出す。フェンスや前後の説明は無視する。"""
+    """出力から、最初の JSON（オブジェクトか配列）を取り出す。フェンスや前後の説明は無視する。
+
+    Args:
+        text: LLM の出力。
+
+    Returns:
+        最初の JSON の文字列。
+
+    Raises:
+        ValueError: JSON が見つからないとき。
+    """
     decoder = json.JSONDecoder()
     for start, char in enumerate(text):
         if char not in "{[":
@@ -31,17 +41,41 @@ def extract_json(text: str) -> str:
 
 
 def json_schema_hint(model: type[BaseModel]) -> str:
-    """プロンプトに添える、出力の形の説明（JSON スキーマ）。"""
+    """プロンプトに添える、出力の形の説明（JSON スキーマ）。
+
+    Args:
+        model: 出力の形を表す Pydantic モデル。
+
+    Returns:
+        整形した JSON スキーマの文字列。
+    """
     return json.dumps(model.model_json_schema(), ensure_ascii=False, indent=2)
 
 
 def _describe(error: ValidationError) -> str:
+    """検証エラーを、場所と理由を並べた1行にする。
+
+    Args:
+        error: Pydantic の検証エラー。
+
+    Returns:
+        例: "claims.0.text: Field required"。
+    """
     return "; ".join(
         f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors()
     )
 
 
 def _retry_request(request: LLMRequest, error: str) -> LLMRequest:
+    """元の依頼に、前回の失敗の理由を添えた作り直しの依頼を作る。
+
+    Args:
+        request: 元の依頼。
+        error: 前回の出力を受け付けなかった理由。
+
+    Returns:
+        1通のメッセージにまとめた依頼。
+    """
     original = request.messages[-1].content
     content = (
         f"{original}\n\n"
@@ -54,6 +88,20 @@ def _retry_request(request: LLMRequest, error: str) -> LLMRequest:
 async def complete_structured[T: BaseModel](
     backend: LLMBackend, request: LLMRequest, model: type[T], retries: int = 1
 ) -> T:
+    """LLM の出力を JSON で受け、モデルで検証する。失敗したら理由を添えて作り直させる。
+
+    Args:
+        backend: LLM のバックエンド。
+        request: 呼び出しの内容。
+        model: 出力の形を表す Pydantic モデル。
+        retries: 作り直す回数の上限。
+
+    Returns:
+        検証を通ったモデルのインスタンス。
+
+    Raises:
+        StructuredOutputError: 出力が途中で切れたとき、または作り直しても形が合わなかったとき。
+    """
     current = request
     errors: list[str] = []
     for _ in range(retries + 1):
