@@ -13,11 +13,11 @@ from llm.fake import ScriptedBackend
 pytestmark = pytest.mark.anyio
 
 
-def _claim(text: str, *ids: str) -> dict[str, object]:
+def make_claim(text: str, *ids: str) -> dict[str, object]:
     return {"text": text, "evidence_ids": list(ids)}
 
 
-async def _saved(
+async def make_saved(
     service: EdinetService, extra: dict[str, list[dict[str, object]]] | None = None
 ) -> SavedResult:
     from agents.evidence import collect_metrics
@@ -27,12 +27,12 @@ async def _saved(
     metrics = collect_metrics(service, "9999", pool)
     eq, ps = metrics["equity_ratio.current"].id, f"E{len(pool.items) + 1}"
     reply: dict[str, list[dict[str, object]]] = {
-        "overview": [_claim("機械を製造している。", ps)],
-        "financial_findings": [_claim("自己資本比率は50.0%である。", eq)],
-        "business_risks": [_claim("原材料価格が高騰する可能性がある。", ps)],
+        "overview": [make_claim("機械を製造している。", ps)],
+        "financial_findings": [make_claim("自己資本比率は50.0%である。", eq)],
+        "business_risks": [make_claim("原材料価格が高騰する可能性がある。", ps)],
         "positives": [],
         "negatives": [],
-        "open_items": [_claim("依存度は確認できなかった。")],
+        "open_items": [make_claim("依存度は確認できなかった。")],
     }
     reply.update(extra or {})
     result = await run_baseline(service, ScriptedBackend([json.dumps(reply)]), "9999")
@@ -40,7 +40,7 @@ async def _saved(
 
 
 async def test_主張ごとに_出典の引用とページを並べ_判定の欄をつける(service: EdinetService) -> None:
-    text = render_review(await _saved(service))
+    text = render_review(await make_saved(service))
 
     assert "# 主張と出典の突き合わせ" in text
     assert "機械を製造している。" in text
@@ -55,28 +55,28 @@ async def test_主張ごとに_出典の引用とページを並べ_判定の欄
 
 
 async def test_出典のない確認事項は_出典なしと明示する(service: EdinetService) -> None:
-    text = render_review(await _saved(service))
+    text = render_review(await make_saved(service))
     block = text.partition("依存度は確認できなかった。")[2][:200]
     assert "出典なし" in block
 
 
 async def test_節ごとに見出しを分け_主張の無い節は作らない(service: EdinetService) -> None:
-    text = render_review(await _saved(service))
+    text = render_review(await make_saved(service))
     for heading in ("## 企業概要", "## 財務の所見", "## 事業リスク", "## 確認が必要な事項"):
         assert heading in text
     assert "## 肯定的な要素" not in text
 
 
 async def test_内規照合の各行も_根拠と一緒に確認できる(service: EdinetService) -> None:
-    text = render_review(await _saved(service))
+    text = render_review(await make_saved(service))
     section = text.partition("## 内規照合")[2]
     assert "第8条" in section and "自己資本比率" in section
     assert "第13条" in section and "確認できなかった" in section
 
 
 async def test_数値の警告がある主張は_確認用にも印と理由を示す(service: EdinetService) -> None:
-    saved = await _saved(
-        service, {"financial_findings": [_claim("自己資本比率は67.4%である。", "E1")]}
+    saved = await make_saved(
+        service, {"financial_findings": [make_claim("自己資本比率は67.4%である。", "E1")]}
     )
     text = render_review(saved)
     block = text.partition("自己資本比率は67.4%である。")[2][:300]
@@ -86,7 +86,7 @@ async def test_数値の警告がある主張は_確認用にも印と理由を�
 async def test_複数ページの引用は_ページごとに分けて示す(service: EdinetService) -> None:
     from retrieval.citations import SourceSpan
 
-    saved = await _saved(service)
+    saved = await make_saved(service)
     passage = next(e for e in saved.evidence.values() if e.kind == "passage")
     two = passage.model_copy(
         update={
@@ -106,7 +106,7 @@ async def test_複数ページの引用は_ページごとに分けて示す(ser
 async def test_保存した結果の読み込みは_存在しない出典IDを理由つきで拒否する(
     service: EdinetService,
 ) -> None:
-    saved = await _saved(service)
+    saved = await make_saved(service)
     data = json.loads(saved.model_dump_json())
     data["memo"]["overview"][0]["evidence_ids"] = ["E999"]
     with pytest.raises(ValueError, match="E999"):
@@ -118,7 +118,7 @@ async def test_Verifierの判定があれば_主張の下に示す_人の判定�
 ) -> None:
     from agents.memo import VerificationRecord
 
-    saved = await _saved(service)
+    saved = await make_saved(service)
     text0 = saved.memo.financial_findings[0].text
     saved.memo.verifications = [
         VerificationRecord(
