@@ -29,8 +29,15 @@ def review(path: Path, blind: bool = False) -> Path:
     Returns:
         書き出した Markdown のパス。
     """
+    saved = load_result(path)
+    if blind and not saved.memo.verifications:
+        log.warning(
+            "%s: Verifier の判定が入っていない（--verify-rounds なしで生成した）ため、"
+            "盲検にしても通常の出力と同じ内容になる。比べる相手がない",
+            path,
+        )
     out = path.with_suffix(".blind.review.md" if blind else ".review.md")
-    out.write_text(render_review(load_result(path), blind=blind), encoding="utf-8")
+    out.write_text(render_review(saved, blind=blind), encoding="utf-8")
     return out
 
 
