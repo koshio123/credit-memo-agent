@@ -55,6 +55,12 @@ async def _main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sec-code", nargs="+", required=True)
     parser.add_argument("--mode", choices=["multi_agent", "baseline"], default="multi_agent")
+    parser.add_argument(
+        "--verify-rounds",
+        type=int,
+        default=None,
+        help="指定すると Verifier で検証し、失敗した主張を最大この回数まで書き直す（0 は検証だけ）",
+    )
     parser.add_argument("--out", type=Path, default=Path("data/memos"))
     args = parser.parse_args()
 
@@ -71,7 +77,7 @@ async def _main() -> int:
     failed = 0
     for sec_code in args.sec_code:
         try:
-            result: MemoResult = await run(service, backend, sec_code)
+            result: MemoResult = await run(service, backend, sec_code, args.verify_rounds)
         except (EdinetMcpError, StructuredOutputError) as e:
             # 会社ごとの失敗（対象外の証券コード、データ未取得など）は、他の会社に影響させない
             failed += 1

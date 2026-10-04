@@ -10,6 +10,7 @@ from collections.abc import Coroutine, Sequence
 from dataclasses import dataclass
 
 from agents.evidence import LEVEL_RATIOS, collect_metrics, collect_passages
+from agents.machine import run_verification
 from agents.memo import DraftOut, Failure, Flagged, MemoDraft, MemoOut
 from agents.planner import DEFAULT_OVERVIEW_QUERIES, DEFAULT_RISK_QUERIES, make_plan
 from agents.policy import GoingConcernResult, build_policy_rows, check_going_concern
@@ -182,7 +183,12 @@ def _evidence_ids(claims: Sequence[Claim]) -> set[str]:
     return {e for c in claims for e in c.evidence_ids}
 
 
-async def run_baseline(service: EdinetService, backend: LLMBackend, sec_code: str) -> MemoResult:
+async def run_baseline(
+    service: EdinetService,
+    backend: LLMBackend,
+    sec_code: str,
+    verify_rounds: int | None = None,
+) -> MemoResult:
     """単一エージェント: 固定の問いで集めた証拠を、1 回の呼び出しで全部の節に書かせる。
 
     Args:
@@ -233,10 +239,16 @@ async def run_baseline(service: EdinetService, backend: LLMBackend, sec_code: st
         setattr(memo, section, accepted)
         _record(memo, flagged)
     _finish_policy(memo, service, pool, ctx.metrics)
-    return _result(memo, pool, counting, "baseline", ctx.metrics)
+    mode = await _verify(counting, pool, memo, "baseline", verify_rounds)
+    return _result(memo, pool, counting, mode, ctx.metrics)
 
 
-async def run_multi_agent(service: EdinetService, backend: LLMBackend, sec_code: str) -> MemoResult:
+async def run_multi_agent(
+    service: EdinetService,
+    backend: LLMBackend,
+    sec_code: str,
+    verify_rounds: int | None = None,
+) -> MemoResult:
     """Planner が問いを決め、Worker が節ごとに書き、Drafter が論点と確認事項をまとめる。
 
     Args:
@@ -328,7 +340,8 @@ async def run_multi_agent(service: EdinetService, backend: LLMBackend, sec_code:
         )
         setattr(memo, section, accepted)
         _record(memo, flagged)
-    return _result(memo, pool, counting, "multi_agent", ctx.metrics)
+    mode = await _verify(counting, pool, memo, "multi_agent", verify_rounds)
+    return _result(memo, pool, counting, mode, ctx.metrics)
 
 
 async def _guarded(
@@ -349,6 +362,28 @@ async def _guarded(
     except StructuredOutputError as e:
         memo.failures.append(Failure(section=section, message=str(e)[:300]))
         return []
+
+
+async def _verify(
+    backend: LLMBackend, pool: EvidencePool, memo: MemoDraft, mode: str, rounds: int | None
+) -> str:
+    """verify_rounds が指定されていれば検証と差し戻しを行い、構成の名前を返す。
+
+    Args:
+        backend: 呼び出しを数えるバックエンド。
+        pool: 証拠の集まり。
+        memo: 下書きのメモ。
+        mode: 検証前の構成の名前。
+        rounds: 書き直しの最大回数。None なら検証しない。
+
+    Returns:
+        構成の名前（検証したときは verify<回数> を付ける）。
+    """
+    memo.quarantined = list(pool.quarantined)
+    if rounds is None:
+        return mode
+    await run_verification(backend, pool, memo, max_rounds=rounds)
+    return f"{mode}_verify{rounds}"
 
 
 def _id_number(evidence_id: str) -> int:

@@ -217,3 +217,36 @@ async def test_表のセルの縦線は壊さない(service: EdinetService) -> N
     )
     text = render_memo(result)
     assert "A\\|B" in text
+
+
+async def test_検証していなければ_意味は未検証と明記し_していれば結果を載せる(
+    service: EdinetService,
+) -> None:
+    from agents.memo import RoundRecord, VerificationRecord
+
+    result = await make_result(service)
+    record = render_memo(result).partition("## 検査の記録")[2]
+    assert "実施していない" in record and "未検証" in record
+
+    result.memo.rounds = [
+        RoundRecord(round_no=0, n_verified=3, counts={"supported": 2, "partial": 1})
+    ]
+    text = result.memo.financial_findings[0].text
+    result.memo.verifications = [
+        VerificationRecord(section="financial_findings", claim_text=text, verdict="cannot_judge")
+    ]
+    out = render_memo(result)
+    assert "ラウンド 0: 3 件を検証" in out.partition("## 検査の記録")[2]
+    assert "未検証" not in out.partition("## 検査の記録")[2]
+    line = next(x for x in out.splitlines() if x.startswith("- ") and text in x)
+    assert "❓検証者が判断できなかった" in line
+
+
+async def test_隔離した本文は_検査の記録に載せる(service: EdinetService) -> None:
+    from agents.state import Quarantined
+
+    result = await make_result(service)
+    result.memo.quarantined = [
+        Quarantined(doc_id="D", page_start=7, page_end=7, rules=["ignore_previous_ja"], snippet="x")
+    ]
+    assert "p.7（ignore_previous_ja）" in render_memo(result).partition("## 検査の記録")[2]

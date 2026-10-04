@@ -111,3 +111,19 @@ async def test_保存した結果の読み込みは_存在しない出典IDを�
     data["memo"]["overview"][0]["evidence_ids"] = ["E999"]
     with pytest.raises(ValueError, match="E999"):
         SavedResult.model_validate(data)
+
+
+async def test_Verifierの判定があれば_主張の下に示す_人の判定と比べるため(
+    service: EdinetService,
+) -> None:
+    from agents.memo import VerificationRecord
+
+    saved = await _saved(service)
+    text0 = saved.memo.financial_findings[0].text
+    saved.memo.verifications = [
+        VerificationRecord(
+            section="financial_findings", claim_text=text0, verdict="partial", reason="言い過ぎ"
+        )
+    ]
+    out = render_review(saved)
+    assert "Verifier（LLM）の判定: partial（言い過ぎ）" in out
