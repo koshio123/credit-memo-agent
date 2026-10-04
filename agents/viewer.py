@@ -5,6 +5,7 @@
 再配布しない）。埋め込むのは、メモが引用している範囲の引用文だけ。外部の資源は読み込まない。
 """
 
+from collections.abc import Sequence
 from html import escape
 
 from agents.export import SavedResult
@@ -62,6 +63,7 @@ margin:.4rem 0;
 
 font-size:.92rem}
 .panel[hidden]{display:none}
+@media print{.panel[hidden],tr[hidden]{display:block!important}}
 blockquote{margin:.3rem 0;
 padding-left:.6rem;
 border-left:2px solid var(--line);
@@ -85,21 +87,12 @@ text-align:left}
 _JS = """
 document.addEventListener('click',function(e){
   var b=e.target.closest('button.cite'); if(!b) return;
-  var src=document.getElementById(b.dataset.target); if(!src) return;
-  var host=b.closest('li, tr'); if(!host) return;
-  var key=b.dataset.target, found=null;
-  host.querySelectorAll('.inline').forEach(function(x){ if(x.dataset.src===key) found=x; });
-  var next=host.nextElementSibling;
-  if(!found && next && next.classList.contains('inline-row') && next.dataset.src===key) found=next;
-  if(found){ found.remove(); b.setAttribute('aria-expanded','false'); return; }
-  var copy=src.cloneNode(true); copy.removeAttribute('id'); copy.removeAttribute('hidden');
-  copy.classList.add('inline'); copy.dataset.src=key;
-  if(host.tagName==='TR'){
-    var row=document.createElement('tr'); row.className='inline-row'; row.dataset.src=key;
-    var td=document.createElement('td'); td.colSpan=host.children.length; td.appendChild(copy);
-    row.appendChild(td); host.parentNode.insertBefore(row, host.nextSibling);
-  } else { host.appendChild(copy); }
-  b.setAttribute('aria-expanded','true');
+  var p=document.getElementById(b.dataset.target); if(!p) return;
+  var open=p.hasAttribute('hidden');
+  if(open){p.removeAttribute('hidden')}else{p.setAttribute('hidden','')}
+  var row=p.closest('tr');
+  if(row){ if(open){row.removeAttribute('hidden')}else{row.setAttribute('hidden','')} }
+  b.setAttribute('aria-expanded', open?'true':'false');
 });
 """
 
@@ -113,6 +106,7 @@ def _pdf_link(doc_id: str, page: int, pdf_base: str | None) -> str:
 
 
 def _panel(
+    panel_id: str,
     number: int,
     evidence: PassageEvidence | MetricEvidence,
     pdf_base: str | None,
@@ -137,7 +131,7 @@ def _panel(
             f"{escape(evidence.display)}。{where}）"
             f"</div><blockquote>{escape(evidence.basis)}</blockquote>"
         )
-    return f'<div class="panel" id="ev-{number}" hidden><b>[{number}]</b> {inner}</div>'
+    return f'<div class="panel" id="{panel_id}" hidden><b>[{number}]</b> {inner}</div>'
 
 
 def render_html(saved: SavedResult, pdf_base: str | None = None) -> str:
@@ -152,16 +146,23 @@ def render_html(saved: SavedResult, pdf_base: str | None = None) -> str:
     """
     memo = saved.memo
     order: dict[str, int] = {}
+    counter = 0
     verdicts = {(v.section, v.claim_text): v for v in memo.verifications}
 
-    def cite(claim: Claim) -> str:
+    def cite(evidence_ids: Sequence[str]) -> tuple[str, list[str]]:
+        """引用ごとに、押すボタンと、その直後に置く隠した欄（引用ごとに別の id）を作る。"""
+        nonlocal counter
         buttons: list[str] = []
-        for evidence_id in claim.evidence_ids:
+        panels: list[str] = []
+        for evidence_id in evidence_ids:
             n = order.setdefault(evidence_id, len(order) + 1)
+            counter += 1
+            panel_id = f"p{counter}"
             buttons.append(
-                f'<button class="cite" data-target="ev-{n}" aria-expanded="false">{n}</button>'
+                f'<button class="cite" data-target="{panel_id}" aria-expanded="false">{n}</button>'
             )
-        return "".join(buttons)
+            panels.append(_panel(panel_id, n, saved.evidence[evidence_id], pdf_base, memo.doc_id))
+        return "".join(buttons), panels
 
     body: list[str] = []
     for key, label in CLAIM_SECTIONS:
@@ -180,28 +181,24 @@ def render_html(saved: SavedResult, pdf_base: str | None = None) -> str:
                 )
                 if judged.reason:
                     tag += f'<span class="note"> {escape(judged.reason)}</span>'
-            body.append(f"<li>{escape(claim.text)}{cite(claim)}{tag}</li>")
+            buttons, panels = cite(claim.evidence_ids)
+            body.append(f"<li>{escape(claim.text)}{buttons}{tag}{''.join(panels)}</li>")
         body.append("</ul>")
 
     body.append(
-        "<h2>内規への照合結果</h2><table><tr><th>条項</th><th>確認内容</th><th>結果</th><th>根拠</th></tr>"
+        "<h2>内規への照合結果</h2>"
+        "<table><tr><th>条項</th><th>確認内容</th><th>結果</th><th>根拠</th></tr>"
     )
     for row in memo.policy_rows:
-        cites = "".join(
-            f'<button class="cite" data-target="ev-{order.setdefault(e, len(order) + 1)}" '
-            f'aria-expanded="false">{order[e]}</button>'
-            for e in row.evidence_ids
-        )
+        buttons, panels = cite(row.evidence_ids)
         body.append(
             f"<tr><td>{escape(row.clause)}</td><td>{escape(row.check)}</td>"
-            f"<td>{escape(row.result)}</td><td>{cites}</td></tr>"
+            f"<td>{escape(row.result)}</td><td>{buttons}</td></tr>"
         )
+        # 欄は行の下に、引用ごとに1行で置く（隠しておき、押すと開く）
+        body.extend(f'<tr hidden><td colspan="4">{panel}</td></tr>' for panel in panels)
     body.append("</table>")
 
-    panels = "".join(
-        _panel(n, saved.evidence[evidence_id], pdf_base, memo.doc_id)
-        for evidence_id, n in sorted(order.items(), key=lambda kv: kv[1])
-    )
     rounds = "".join(
         f"<li>ラウンド {r.round_no}: {r.n_verified} 件を検証（"
         + escape("、".join(f"{k} {v}" for k, v in sorted(r.counts.items())))
@@ -221,11 +218,12 @@ def render_html(saved: SavedResult, pdf_base: str | None = None) -> str:
     return (
         '<!doctype html><html lang="ja"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        f"<title>{escape(title)}</title><style>{_CSS}</style></head><body>"
+        f"<title>{escape(title)}</title><style>{_CSS}</style>"
+        "<noscript><style>[hidden]{display:block!important}</style></noscript></head><body>"
         f"<h1>{escape(title)}</h1>"
         '<p class="note">システムによる草案。人によるレビューを経るまで、審査資料として使用しない。'
         "融資の可否・金利・限度額・担保の要否について、結論も推奨も含まない。"
         "出典の番号を押すと、引用文・ページ・算式が出る。</p>"
         f"{''.join(body)}{inspection}"
-        f'<div id="sources" hidden>{panels}</div><script>{_JS}</script></body></html>'
+        f"<script>{_JS}</script></body></html>"
     )
