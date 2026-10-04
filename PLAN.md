@@ -107,7 +107,7 @@ Claude Pro のサブスクリプションには **API利用枠が含まれない
 | W1 **完了** | 取り込みとL1評価 | EDINET取得、PDF構造化（基準線の pdfplumber。3方式の比較は L1 が飽和したため保留）、XBRLとの照合結果の表、保留データ10社の追加（評価設問の初版は W2 で作成） |
 | W2 **完了** | 検索とMCP | BM25＋埋め込みの融合検索（リランクは未実施）、L2のRecall@k・MRR、`edinet-mcp` を MCP サーバーとして実装し Agent SDK から呼べることを確認（単体パッケージとしての公開は W5 で判断） |
 | W3 | エージェント | 証拠の集め方の設計を決める（9-4）→ 出典スパンと引用の照合（決定的）→ 単一エージェントのベースライン → Planner/Worker/Drafter、財務比率はコード実行で計算 |
-| W4 | 検証・引用・UI | Verifier、差し戻しループ、ガードレール、引用ビューア（静的サイト） |
+| W4 **完了** | 検証・引用・UI | Verifier、差し戻しループ（状態機械）、ガードレール、引用ビューア（Python が生成する単体の静的 HTML。Next.js は作らない）。故障注入・一致率の測定は W5 |
 | W5 | 評価と発信 | L3評価、アブレーション、エラー分析、5社分のメモを生成、README、デモ動画、技術記事1本 |
 
 **MVPの線引き**：時間が足りなくなったら、UIは素の静的HTMLにし、L3の人手ラベルは30件まで減らす。Verifier、引用、アブレーション表は必ず残す。
@@ -128,7 +128,7 @@ credit-memo-agent/
 ├── llm/           # バックエンド抽象（claude_code / local / anthropic_api）＋キャッシュ
 ├── agents/        # （W3）planner, workers, drafter, verifier, state.py
 ├── api/           # （W4以降）FastAPI（ローカル実行用）
-├── web/           # （W4）Next.js 静的サイト（事前生成メモの表示）
+├── web/           # （作らない）Next.js。引用ビューアは agents/viewer.py が単体の HTML を生成する
 ├── evals/         # datasets/（企業・L2設問）, l1.py, l2.py, ground_truth.py, reports/
 ├── policies/      # 架空の融資内規
 ├── templates/     # 与信メモの雛形
@@ -208,6 +208,17 @@ W2 までで、エージェントが使う材料（検索・財務数値・比�
 - [x] 単一エージェントのベースライン（1 回の呼び出し）と、マルチエージェント（Planner → 概要・財務・リスクの Worker → 内規照合（コード）→ Drafter。LLM 呼び出し 5 回）（`agents/pipeline.py`）
 - [x] メモの Markdown 出力（テンプレートの構成、表と出典番号はコード）と保存、生成コマンド（`agents/render.py`, `scripts/generate_memo.py`）
 - [x] 実機での確認: ローカル LLM（8B）で配線を確認し、Claude（少量・手動）で内容を見た。結果と、見つかった問題（Planner が概要の問いを外す、空の節の表記）は docs/decisions.md に記録した
-- [ ] 手順を **ステートマシンにする**のは W4 に回す。W3 の手順は分岐のない直線で、検査で除外された主張を作り直す輪（差し戻し）が入る W4 で状態遷移にする
+- [x] 手順のステートマシン化は W4 で、検証と差し戻しの部分に行った（`agents/machine.py`）
 
-W4 以降に残る: 主張が出典に支えられているかの意味の検証（Verifier）、差し戻し、ガードレール（本文中の指示の混入など）、引用ビューア、L3 評価。
+### 9-5. W4 の作業リスト（完了）
+
+- [x] 設計の決定（docs/decisions.md「W4: Verifier・差し戻し・ガードレール・引用ビューアの設計」）
+- [x] ガードレール: 本文中の指示の検出と隔離（`agents/guard.py`。実データで誤検出 0）
+- [x] Verifier（`agents/verifier.py`）と、検証・差し戻しの状態機械（`agents/machine.py`。最大 2 回）
+- [x] パイプラインへの組み込み（`--verify-rounds`）と、判定・隔離の出力
+- [x] 引用ビューア（`agents/viewer.py`, `scripts/view_memo.py`）
+- [x] 実機確認（1 社）。Claude Code の出力超過の問題を発見して対処した
+- [ ] 手動テスト: Verifier の判定と人の判定を比べる（docs/manual_test.md E-3 を、検証つきのメモで行う）
+- [ ] ブラウザでビューアの表示・操作を確認する
+
+W5 に残る: 故障注入での検出率、Verifier と人の判定の一致率、アブレーション（単一→マルチ→＋Verifier→＋差し戻し）、L3 評価、事前生成メモ 5 社、README・デモ動画。
