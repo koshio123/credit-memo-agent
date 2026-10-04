@@ -280,3 +280,68 @@ async def test_全ページの本文を取れる(service: EdinetService) -> None
     from tests.edinet_fakes import PAGES
 
     assert service.all_pages("9999") == PAGES
+
+
+async def test_検証を有効にすると_Verifierの判定がメモに残り_構成名に回数がつく(
+    service: EdinetService,
+) -> None:
+    eq, ps = ids(service)
+    memo_reply = reply(
+        overview=[claim("機械を製造している。", ps)],
+        financial_findings=[claim("自己資本比率は50.0%である。", eq)],
+        business_risks=[],
+        positives=[],
+        negatives=[],
+        open_items=[claim("依存度は確認できなかった。")],
+    )
+    verdict = json.dumps(
+        {
+            "verdicts": [
+                {"index": 0, "verdict": "supported", "reason": ""},
+                {"index": 1, "verdict": "unsupported", "reason": "証拠にない"},
+            ]
+        }
+    )
+    revise = json.dumps({"revisions": [{"index": 0, "text": None}]})
+    backend = ScriptedBackend([memo_reply, verdict, revise])
+    result = await run_baseline(service, backend, "9999", verify_rounds=1)
+
+    assert result.mode == "baseline_verify1"
+    assert result.calls == 3
+    assert [c.text for c in result.memo.overview] == ["機械を製造している。"]
+    assert result.memo.financial_findings == []
+    assert [r.section for r in result.memo.rejected] == ["financial_findings"]
+    assert result.memo.rounds and result.memo.rounds[0].counts["unsupported"] == 1
+
+
+async def test_検証しなければ_従来どおりで_構成名は変わらない(service: EdinetService) -> None:
+    empty = reply(
+        overview=[],
+        financial_findings=[],
+        business_risks=[],
+        positives=[],
+        negatives=[],
+        open_items=[],
+    )
+    result = await run_baseline(service, ScriptedBackend([empty]), "9999")
+    assert result.mode == "baseline" and result.memo.rounds == []
+
+
+async def test_検証中にバックエンドが失敗しても_書き上げたメモは残し_失敗を記録する(
+    service: EdinetService,
+) -> None:
+    eq, ps = ids(service)
+    memo_reply = reply(
+        overview=[claim("機械を製造している。", ps)],
+        financial_findings=[claim("自己資本比率は50.0%である。", eq)],
+        business_risks=[],
+        positives=[],
+        negatives=[],
+        open_items=[],
+    )
+    backend = ScriptedBackend([memo_reply, LLMBackendError("利用枠の上限")])
+    result = await run_baseline(service, backend, "9999", verify_rounds=2)
+
+    assert result.memo.overview and result.memo.financial_findings  # メモは残る
+    assert [f.section for f in result.memo.failures] == ["verification"]
+    assert result.memo.rounds == [] and result.memo.verifications == []

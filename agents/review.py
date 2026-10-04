@@ -54,6 +54,7 @@ def render_review(saved: SavedResult) -> str:
     """
     memo = saved.memo
     warned = {f.claim.text: f for f in memo.warnings}
+    verified = {(v.section, v.claim_text): v for v in memo.verifications}
     lines = [
         "# 主張と出典の突き合わせ",
         "",
@@ -74,6 +75,9 @@ def render_review(saved: SavedResult) -> str:
         for claim in claims:
             number += 1
             lines += [f"### {number}. {claim.text}", ""]
+            judged = verified.get((key, claim.text))
+            if judged is not None and judged.verdict != "not_applicable":
+                lines.append(f"  - Verifier（LLM）の判定: {judged.verdict}（{judged.reason}）")
             if claim.text in warned:
                 reasons = "; ".join(i.message for i in warned[claim.text].issues)
                 lines += [f"  - ⚠ 機械検査の警告: {reasons}"]

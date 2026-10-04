@@ -63,23 +63,21 @@ class _Refs:
         return "".join(f"[{n}]" for n in numbers)
 
 
-def _claims(claims: Sequence[Claim], refs: _Refs, warned: set[str]) -> list[str]:
+def _claims(claims: Sequence[Claim], refs: _Refs, warned: dict[str, str]) -> list[str]:
     """節の主張を、出典の番号つきの箇条書きにする。
 
     Args:
         claims: 節の主張。
         refs: 出典の番号の振り分け。
-        warned: 数値の警告がある主張の本文。
+        warned: 主張の本文 → 末尾に付ける印（数値の警告、検証者が判断できなかった、など）。
 
     Returns:
         Markdown の行。主張が無ければ、その旨の1行。
     """
     if not claims:
         return ["- （主張を得られなかった。資料に記載がないことを意味しない。検査の記録を参照）"]
-    mark = " ⚠数値要確認"
     return [
-        f"- {c.text} {refs.of(c.evidence_ids)}".rstrip() + (mark if c.text in warned else "")
-        for c in claims
+        f"- {c.text} {refs.of(c.evidence_ids)}".rstrip() + warned.get(c.text, "") for c in claims
     ]
 
 
@@ -250,14 +248,16 @@ def _policy_table(memo: MemoDraft, refs: _Refs) -> list[str]:
     return lines
 
 
-def _open_items(memo: MemoDraft, result: MemoResult, refs: _Refs, warned: set[str]) -> list[str]:
+def _open_items(
+    memo: MemoDraft, result: MemoResult, refs: _Refs, warned: dict[str, str]
+) -> list[str]:
     """確認が必要な事項を作る。LLM が挙げたものに、算定不能の指標と借換えへの依存の確認を足す。
 
     Args:
         memo: 下書きのメモ。
         result: 生成結果。
         refs: 出典の番号の振り分け。
-        warned: 数値の警告がある主張の本文。
+        warned: 主張の本文 → 末尾に付ける印（数値の警告、検証者が判断できなかった、など）。
 
     Returns:
         Markdown の行。何も無ければ、その旨の1行。
@@ -290,6 +290,30 @@ def _flag_lines(items: Sequence[Flagged]) -> list[str]:
     ] or ["- なし"]
 
 
+def _verifier_lines(memo: MemoDraft) -> list[str]:
+    """Verifier による検証の要約。実施していなければ、意味は未検証と明記する。
+
+    Args:
+        memo: 下書きのメモ。
+
+    Returns:
+        Markdown の行。
+    """
+    if not memo.rounds:
+        return [
+            "**Verifier による検証は実施していない。主張が出典の内容に支えられているか（意味）は"
+            "未検証。**"
+        ]
+    lines = [
+        "Verifier（LLM）で、主張が出典の内容に支えられているかを検証した。"
+        "LLM による判定で、誤ることがある（人の判定との一致率は未測定）。"
+    ]
+    for r in memo.rounds:
+        counts = "、".join(f"{k} {v}" for k, v in sorted(r.counts.items()))
+        lines.append(f"- ラウンド {r.round_no}: {r.n_verified} 件を検証（{counts}）")
+    return lines
+
+
 def _inspection(memo: MemoDraft) -> list[str]:
     """検査の記録の節を作る。
 
@@ -308,8 +332,16 @@ def _inspection(memo: MemoDraft) -> list[str]:
         "## 検査の記録",
         "",
         "このメモに対して、コードで次の検査をした: 出典の有無、出典の存在、数値が出典と合うか、"
-        "結論を示す語。**主張が出典の内容に支えられているか（意味）は検証していない**"
-        "（検証エージェントは今後実装する）。",
+        "結論を示す語。",
+        "",
+        *_verifier_lines(memo),
+        "",
+        "本文に指示の形が混入していたため、証拠にしなかった箇所: "
+        + (
+            "、".join(f"p.{q.page_start}（{'・'.join(q.rules)}）" for q in memo.quarantined)
+            if memo.quarantined
+            else "なし"
+        ),
         "",
         "主張が1件も得られなかった節: " + ("、".join(empty) if empty else "なし"),
         "",
@@ -340,7 +372,12 @@ def render_memo(result: MemoResult) -> str:
     """
     memo, pool = result.memo, result.pool
     refs = _Refs()
-    warned = {f.claim.text for f in memo.warnings}
+    warned = {f.claim.text: " ⚠数値要確認" for f in memo.warnings}
+    for record in memo.verifications:
+        if record.verdict == "cannot_judge":
+            warned[record.claim_text] = (
+                warned.get(record.claim_text, "") + " ❓検証者が判断できなかった"
+            )
     out: list[str] = _header(memo)
     out += ["## 0. 最優先の確認事項", "", *_going_concern(memo, pool, refs), ""]
     out += ["## 1. 企業概要", "", *_claims(memo.overview, refs, warned), ""]

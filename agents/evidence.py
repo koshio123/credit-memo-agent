@@ -8,7 +8,8 @@ import re
 from collections.abc import Sequence
 from decimal import ROUND_HALF_UP, Decimal
 
-from agents.state import EvidencePool, MetricEvidence, PassageEvidence
+from agents.guard import scan_injection
+from agents.state import EvidencePool, MetricEvidence, PassageEvidence, Quarantined
 from edinet_mcp.models import FinancialsResult, Period, RatiosResult
 from edinet_mcp.service import EdinetService
 from finance.ratios import FlagResult, PeriodFinancials, RatioResult
@@ -336,6 +337,19 @@ def collect_passages(
     for query in queries:
         evidences: list[PassageEvidence] = []
         for passage in service.search_filings(query, sec_code, k=k):
+            rules = scan_injection(passage.text)
+            if rules:
+                # 指示の形をした本文は、LLM に渡さない（データであって、指示ではない）
+                entry = Quarantined(
+                    doc_id=passage.doc_id,
+                    page_start=passage.page_start,
+                    page_end=passage.page_end,
+                    rules=rules,
+                    snippet=passage.text[:80],
+                )
+                if entry not in pool.quarantined:  # 同じ箇所が複数の問いで見つかっても1件
+                    pool.quarantined.append(entry)
+                continue
             evidence = pool.find_passage(passage.spans) or pool.add(
                 PassageEvidence(
                     id="",

@@ -123,6 +123,24 @@ uv run python -m scripts.review_memo data/memos/6744_multi_agent_<backend>.json
 - 論点（第5節）が、財務の所見（2.2）の言い換えになりやすい。
 - 対象の20社は健全な会社ばかり。第10・11・13条の「該当」側は、実データでは見られない。
 
+## E-5. W4: Verifier・引用ビューア・ガードレール
+
+```bash
+# 検証つきで生成（Claude の利用枠を使う。1社、LLM 約10回。同じ入力はキャッシュされる）
+LLM_BACKEND=claude_code uv run python -m scripts.generate_memo --sec-code 6744 --mode multi_agent --verify-rounds 2
+uv run python -m scripts.review_memo data/memos/6744_multi_agent_verify2_claude_code.json
+uv run python -m scripts.view_memo data/memos/6744_multi_agent_verify2_claude_code.json \
+    --pdf-base "file://$PWD/data/edinet/{doc_id}/{doc_id}.pdf"
+open data/memos/6744_multi_agent_verify2_claude_code.html
+```
+
+- [ ] `…review.md` の各主張に「Verifier（LLM）の判定」が出る。**E-3 で自分が付けた判定と、Verifier の判定を比べる**（食い違いを数える。これが一致率の最初の標本）
+- [ ] 食い違いのうち、Verifier が「支持」と言ったのに自分は「支持しない」としたものを特に記録する（言いすぎの検出漏れ）
+- [ ] HTML をブラウザで開く: 主張の末尾の番号を押すと、引用文・ページ・算式が開閉する。ダークモードでも読める。スマホ幅（ウィンドウを細くする）で崩れない
+- [ ] `--pdf-base` を付けた場合、「PDF を開く」で該当ページが開く（ブラウザによっては `#page=` が効かない）
+- [ ] メモの「検査の記録」に、Verifier のラウンドごとの件数と、隔離した本文（通常は「なし」）が出る
+- [ ] ガードレール: 本文に指示を混ぜる検出は、実データでは起きない。`uv run pytest tests/agents/test_guard.py` で、検出する文・しない文を確かめる
+
 ## F. 異常系
 
 | やること | 期待 |

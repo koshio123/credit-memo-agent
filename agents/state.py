@@ -67,11 +67,24 @@ class MetricEvidence(BaseModel):
 Evidence = Annotated[PassageEvidence | MetricEvidence, Field(discriminator="kind")]
 
 
+class Quarantined(BaseModel):
+    """指示の形をしていたため、証拠にしなかった本文（記録用）。"""
+
+    model_config = ConfigDict(frozen=True)
+
+    doc_id: str
+    page_start: int
+    page_end: int
+    rules: list[str]
+    snippet: str  # 先頭の一部（確認用）
+
+
 class EvidencePool:
     """証拠の集まり。追加すると、E1 から順に ID が振られる。"""
 
     def __init__(self) -> None:
         self.items: dict[str, PassageEvidence | MetricEvidence] = {}
+        self.quarantined: list[Quarantined] = []
 
     def add[T: (PassageEvidence, MetricEvidence)](self, evidence: T) -> T:
         """証拠を追加し、E1 から順の ID を振る。

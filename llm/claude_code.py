@@ -145,15 +145,18 @@ class ClaudeCodeBackend:
                 thinking={"type": "adaptive"} if self._think else {"type": "disabled"},
                 env={"CLAUDE_CODE_MAX_OUTPUT_TOKENS": str(request.max_tokens)},
             )
-            return await self._run(request.messages[0].content, options, model)
+            return await self._run(request.messages[0].content, options, model, request.max_tokens)
 
-    async def _run(self, prompt: str, options: ClaudeAgentOptions, model: str) -> LLMResponse:
+    async def _run(
+        self, prompt: str, options: ClaudeAgentOptions, model: str, max_tokens: int
+    ) -> LLMResponse:
         """Agent SDK を呼んで、結果メッセージを応答にする。
 
         Args:
             prompt: 送る文面。
             options: Agent SDK のオプション。
             model: 依頼したモデル名。実際に使われたモデルが分かればそちらを記録する。
+            max_tokens: 依頼した出力の上限。これを超えた出力は、切れた応答として扱う。
 
         Returns:
             LLM の応答。
@@ -179,7 +182,19 @@ class ClaudeCodeBackend:
 
         if result is None:
             raise LLMBackendError("Claude Code から結果が返りませんでした")
-        return self._to_response(result, served_model)
+        response = self._to_response(result, served_model)
+        # 思考を有効にしているときは、思考のトークンが出力に数えられうるので、この判定はしない
+        if not self._think and response.usage.output_tokens > max_tokens:
+            # Claude Code は max_tokens を超える出力を、続きを自動で生成して継続する。結果の本文は
+            # 最後の続きの部分だけで、先頭が欠ける（実機で、JSON の途中から始まる応答が返った）。
+            # 欠けた本文を採用しないよう、途中で切れた応答として扱う
+            logger.warning(
+                "出力が max_tokens（%d）を超えた（%d）。本文の先頭が欠けるため、切れた応答にします",
+                max_tokens,
+                response.usage.output_tokens,
+            )
+            return response.model_copy(update={"truncated": True})
+        return response
 
     @staticmethod
     def _check_auth(init: dict[str, Any]) -> None:
