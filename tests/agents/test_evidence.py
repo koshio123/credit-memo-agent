@@ -2,6 +2,8 @@
 
 from decimal import Decimal
 
+import pytest
+
 from agents.evidence import collect_metrics, collect_passages
 from agents.state import EvidencePool
 from edinet_mcp.service import EdinetService
@@ -140,3 +142,24 @@ def test_同じ本文が複数の問いで見つかっても_証拠は1つにま
 
 def test_問いが空なら何も集めない(service: EdinetService) -> None:
     assert collect_passages(service, "9999", [], EvidencePool()) == {}
+
+
+# ---- ガードレール ----
+
+
+def test_指示の形の本文は_証拠にせず_隔離して記録する(
+    service: EdinetService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_scan(_text: str) -> list[str]:
+        return ["ignore_previous_ja"]
+
+    monkeypatch.setattr("agents.evidence.scan_injection", fake_scan)
+    pool = EvidencePool()
+
+    found = collect_passages(service, "9999", ["原材料"], pool)
+
+    assert found["原材料"] == []
+    assert pool.items == {}
+    (q,) = pool.quarantined
+    assert q.rules == ["ignore_previous_ja"] and q.doc_id == "S100CUR0"
+    assert (q.page_start, q.page_end) == (2, 3)
