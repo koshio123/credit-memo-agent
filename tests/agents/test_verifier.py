@@ -99,7 +99,7 @@ async def test_知らない判定の値は_判断できないにする() -> None
     assert out[0].verdict == "cannot_judge"
 
 
-async def test_形式を満たせなければ_全部を判断できないにして_失敗を理由に残す() -> None:
+async def test_形式を満たせなければ_1件の場合は判断できないにして_失敗を理由に残す() -> None:
     backend = ScriptedBackend(["だめ", "だめ"])
     out = await verify_claims(backend, _pool(), [Claim(text="a", evidence_ids=["E1"])])
     assert out[0].verdict == "cannot_judge" and "形式" in out[0].reason
@@ -126,3 +126,23 @@ async def test_バックエンドの失敗は_そのまま伝える() -> None:
 
 def test_判定の型() -> None:
     assert ClaimVerdict(index=0, verdict="supported", reason="").verdict == "supported"
+
+
+async def test_まとめた判定が切れたら_半分に分けて再試行する() -> None:
+    from llm.types import LLMResponse
+
+    cut = LLMResponse(text='{"verdicts": [{"ind', backend="b", model="m", truncated=True)
+    claims = [Claim(text=f"主張{i}", evidence_ids=["E1"]) for i in range(4)]
+    backend = ScriptedBackend(
+        [
+            cut,
+            reply(v(0, "supported"), v(1, "partial")),
+            reply(v(0, "unsupported"), v(1, "supported")),
+        ]
+    )
+
+    out = await verify_claims(backend, _pool(), claims)
+
+    assert [x.verdict for x in out] == ["supported", "partial", "unsupported", "supported"]
+    assert len(backend.requests) == 3
+    assert "主張2" in backend.requests[2].messages[0].content

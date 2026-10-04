@@ -239,6 +239,23 @@ async def test_max_tokensで止まったらtruncatedを立てる() -> None:
     assert res.truncated is True
 
 
+async def test_出力がmax_tokensを超えたら_続きだけの応答なのでtruncatedにする() -> None:
+    # 実機: Claude Code は上限を超えると続きを自動生成し、本文は最後の続きだけになった
+    over = _result(text='一致する。"}]}')
+    over.usage = {**(over.usage or {}), "output_tokens": 1805}
+    fake = FakeQuery([_init(), _assistant(), over])
+
+    res = await _backend(fake).complete(_req(max_tokens=1500))
+
+    assert res.truncated is True
+
+
+async def test_出力が上限以内なら_truncatedにしない() -> None:
+    fake = FakeQuery([_init(), _assistant(), _result()])
+    res = await _backend(fake).complete(_req(max_tokens=1500))
+    assert res.truncated is False
+
+
 def test_cache_saltに思考の有無が入る() -> None:
     off = _backend(FakeQuery([]), think=False).cache_salt
     on = _backend(FakeQuery([]), think=True).cache_salt
