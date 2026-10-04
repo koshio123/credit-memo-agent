@@ -65,3 +65,14 @@ async def test_形式の違うJSONは_どの項目が問題かを示す(
     monkeypatch.setattr(sys, "argv", ["review_memo", str(bad)])
     assert main() == 1
     assert "memo" in caplog.text and "evidence" in caplog.text  # 足りない項目の場所
+
+
+async def test_blindは_別のファイル名で書く(
+    service: EdinetService, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = await run_baseline(service, ScriptedBackend([EMPTY]), "9999")
+    _, good = save_result(result, tmp_path, backend="scripted", model="fake")
+    monkeypatch.setattr(sys, "argv", ["review_memo", "--blind", str(good)])
+    assert main() == 0
+    assert good.with_suffix(".blind.review.md").exists()
+    assert not good.with_suffix(".review.md").exists()

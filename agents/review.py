@@ -43,11 +43,12 @@ def _evidence_lines(evidence: PassageEvidence | MetricEvidence) -> list[str]:
     ]
 
 
-def render_review(saved: SavedResult) -> str:
+def render_review(saved: SavedResult, blind: bool = False) -> str:
     """主張と出典を突き合わせるための確認用の Markdown を作る。
 
     Args:
         saved: 保存された生成結果。
+        blind: True なら Verifier の判定を出さない（人の判定が引きずられないようにする）。
 
     Returns:
         判定の欄つきの Markdown。
@@ -76,7 +77,7 @@ def render_review(saved: SavedResult) -> str:
             number += 1
             lines += [f"### {number}. {claim.text}", ""]
             judged = verified.get((key, claim.text))
-            if judged is not None and judged.verdict != "not_applicable":
+            if not blind and judged is not None and judged.verdict != "not_applicable":
                 lines.append(f"  - Verifier（LLM）の判定: {judged.verdict}（{judged.reason}）")
             if claim.text in warned:
                 reasons = "; ".join(i.message for i in warned[claim.text].issues)

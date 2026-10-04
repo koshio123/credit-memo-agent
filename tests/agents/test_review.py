@@ -127,3 +127,19 @@ async def test_Verifierの判定があれば_主張の下に示す_人の判定�
     ]
     out = render_review(saved)
     assert "Verifier（LLM）の判定: partial（言い過ぎ）" in out
+
+
+async def test_blindなら_Verifierの判定を出さない(service: EdinetService) -> None:
+    from agents.memo import VerificationRecord
+
+    saved = await make_saved(service)
+    text0 = saved.memo.financial_findings[0].text
+    saved.memo.verifications = [
+        VerificationRecord(
+            section="financial_findings", claim_text=text0, verdict="partial", reason="言い過ぎ"
+        )
+    ]
+    assert "Verifier（LLM）の判定" in render_review(saved)
+    blind = render_review(saved, blind=True)
+    assert "Verifier" not in blind and "言い過ぎ" not in blind
+    assert "判定:" in blind  # 人が付ける欄は残る
