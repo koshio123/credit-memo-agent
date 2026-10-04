@@ -340,15 +340,15 @@ def collect_passages(
             rules = scan_injection(passage.text)
             if rules:
                 # 指示の形をした本文は、LLM に渡さない（データであって、指示ではない）
-                pool.quarantined.append(
-                    Quarantined(
-                        doc_id=passage.doc_id,
-                        page_start=passage.page_start,
-                        page_end=passage.page_end,
-                        rules=rules,
-                        snippet=passage.text[:80],
-                    )
+                entry = Quarantined(
+                    doc_id=passage.doc_id,
+                    page_start=passage.page_start,
+                    page_end=passage.page_end,
+                    rules=rules,
+                    snippet=passage.text[:80],
                 )
+                if entry not in pool.quarantined:  # 同じ箇所が複数の問いで見つかっても1件
+                    pool.quarantined.append(entry)
                 continue
             evidence = pool.find_passage(passage.spans) or pool.add(
                 PassageEvidence(

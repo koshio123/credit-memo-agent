@@ -33,7 +33,9 @@ _RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
             r"(承認|融資可能|問題なし|推奨)と(出力|回答|記載|記述)(せよ|すること|してください|しなさい)"
         ),
     ),
-    ("role_marker", re.compile(r"</?\s*(system|assistant)\s*>|(^|\s)(assistant|system)\s*:", re.I)),
+    ("role_marker", re.compile(r"</?\s*(system|assistant)\s*>", re.I)),
+    # 行頭の役割の印（「Operating system: …」のような文中の語は対象にしない）
+    ("role_line", re.compile(r"^\s*(assistant|system)\s*:", re.I | re.M)),
 )
 
 
@@ -52,6 +54,6 @@ def scan_injection(text: str) -> list[str]:
     hits: list[str] = []
     for name, pattern in _RULES:
         # 改行・空白で崩された言い回しは空白を除いて、英語と役割の印は空白を残して照合する
-        if pattern.search(flat) or pattern.search(spaced):
+        if pattern.search(flat) or pattern.search(spaced) or pattern.search(normalized):
             hits.append(name)
     return hits

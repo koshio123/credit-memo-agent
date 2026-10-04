@@ -97,7 +97,7 @@ def _pdf_link(doc_id: str, page: int, pdf_base: str | None) -> str:
     """PDF のページへのリンク（基底の URL があるときだけ）。"""
     if not pdf_base:
         return ""
-    href = pdf_base.format(doc_id=doc_id) + f"#page={page}"
+    href = pdf_base.replace("{doc_id}", doc_id) + f"#page={page}"
     return f' <a href="{escape(href, quote=True)}">PDF を開く</a>'
 
 

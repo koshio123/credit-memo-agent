@@ -325,3 +325,23 @@ async def test_検証しなければ_従来どおりで_構成名は変わらな
     )
     result = await run_baseline(service, ScriptedBackend([empty]), "9999")
     assert result.mode == "baseline" and result.memo.rounds == []
+
+
+async def test_検証中にバックエンドが失敗しても_書き上げたメモは残し_失敗を記録する(
+    service: EdinetService,
+) -> None:
+    eq, ps = ids(service)
+    memo_reply = reply(
+        overview=[claim("機械を製造している。", ps)],
+        financial_findings=[claim("自己資本比率は50.0%である。", eq)],
+        business_risks=[],
+        positives=[],
+        negatives=[],
+        open_items=[],
+    )
+    backend = ScriptedBackend([memo_reply, LLMBackendError("利用枠の上限")])
+    result = await run_baseline(service, backend, "9999", verify_rounds=2)
+
+    assert result.memo.overview and result.memo.financial_findings  # メモは残る
+    assert [f.section for f in result.memo.failures] == ["verification"]
+    assert result.memo.rounds == [] and result.memo.verifications == []

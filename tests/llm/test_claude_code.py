@@ -250,6 +250,14 @@ async def test_出力がmax_tokensを超えたら_続きだけの応答なので
     assert res.truncated is True
 
 
+async def test_思考を有効にしているときは_出力トークンの超過でtruncatedにしない() -> None:
+    over = _result()
+    over.usage = {**(over.usage or {}), "output_tokens": 5000}  # 思考のトークンを含みうる
+    fake = FakeQuery([_init(), _assistant(), over])
+    backend = _backend(fake, think=True)
+    assert (await backend.complete(_req(max_tokens=1500))).truncated is False
+
+
 async def test_出力が上限以内なら_truncatedにしない() -> None:
     fake = FakeQuery([_init(), _assistant(), _result()])
     res = await _backend(fake).complete(_req(max_tokens=1500))

@@ -28,7 +28,7 @@ from agents.workers import Context, screen, write_claims
 from edinet_mcp.models import CompanyInfo
 from edinet_mcp.service import EdinetMcpError, EdinetService
 from llm.structured import StructuredOutputError, complete_structured
-from llm.types import LLMBackend, LLMRequest, Message
+from llm.types import LLMBackend, LLMBackendError, LLMRequest, Message
 from llm.usage import CountingBackend
 
 # 財務の所見に渡す数値の証拠（内規照合の記録などは除く）
@@ -382,7 +382,14 @@ async def _verify(
     memo.quarantined = list(pool.quarantined)
     if rounds is None:
         return mode
-    await run_verification(backend, pool, memo, max_rounds=rounds)
+    rejected, warnings = list(memo.rejected), list(memo.warnings)
+    try:
+        await run_verification(backend, pool, memo, max_rounds=rounds)
+    except LLMBackendError as e:
+        # 検証の途中でバックエンドが失敗しても、書き上げたメモは捨てない。未検証である旨を記録する
+        memo.failures.append(Failure(section="verification", message=str(e)[:300]))
+        memo.rounds, memo.verifications = [], []
+        memo.rejected, memo.warnings = rejected, warnings  # 途中までの書き直しの記録は戻す
     return f"{mode}_verify{rounds}"
 
 

@@ -163,3 +163,15 @@ def test_指示の形の本文は_証拠にせず_隔離して記録する(
     (q,) = pool.quarantined
     assert q.rules == ["ignore_previous_ja"] and q.doc_id == "S100CUR0"
     assert (q.page_start, q.page_end) == (2, 3)
+
+
+def test_同じ指示の形の本文が複数の問いで見つかっても_隔離の記録は1件(
+    service: EdinetService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_scan(_text: str) -> list[str]:
+        return ["ignore_previous_ja"]
+
+    monkeypatch.setattr("agents.evidence.scan_injection", fake_scan)
+    pool = EvidencePool()
+    collect_passages(service, "9999", ["問いA", "問いB"], pool)
+    assert len(pool.quarantined) == 1

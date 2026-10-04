@@ -78,3 +78,8 @@ async def test_書類の本体は埋め込まない_引用している範囲だ�
 
 def test_型の確認() -> None:
     assert SavedResult
+
+
+async def test_PDFのひな形に他の波括弧があっても_落ちない(service: EdinetService) -> None:
+    html = render_html(await make_saved(service), pdf_base="file:///a{b}/{doc_id}.pdf")
+    assert 'href="file:///a{b}/S100CUR0.pdf#page=2"' in html

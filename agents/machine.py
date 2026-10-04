@@ -100,8 +100,12 @@ def _reject(memo: MemoDraft, item: _Item, kind: str, message: str) -> None:
 
 async def _revise(
     backend: LLMBackend, pool: EvidencePool, memo: MemoDraft, failing: list[_Item]
-) -> list[_Item]:
-    """失敗した主張を書き直させる。書き直せた主張（機械検査も通ったもの）を返す。"""
+) -> dict[int, _Item]:
+    """失敗した主張を書き直させる。
+
+    Returns:
+        書き直せた主張（機械検査も通ったもの）。元の主張の id → 新しい主張。
+    """
     request = LLMRequest(
         system=SYSTEM,
         messages=[Message(role="user", content=_revise_prompt(pool, failing))],
@@ -113,9 +117,9 @@ async def _revise(
     except StructuredOutputError as e:
         for item in failing:
             _reject(memo, item, "verifier_failed", f"書き直せなかった（形式）: {str(e)[:100]}")
-        return []
+        return {}
     by_index = {r.index: r for r in out.revisions if 0 <= r.index < len(failing)}
-    revised: list[_Item] = []
+    revised: dict[int, _Item] = {}
     for n, item in enumerate(failing):
         reason = item.verdict.reason if item.verdict else ""
         rev = by_index.get(n)
@@ -135,7 +139,7 @@ async def _revise(
             continue
         if records:
             memo.warnings.append(Flagged(section=item.section, claim=new_claim, issues=records))
-        revised.append(_Item(item.section, new_claim))
+        revised[id(item)] = _Item(item.section, new_claim)
     return revised
 
 
@@ -187,8 +191,11 @@ async def run_verification(
         stage = next_stage(stage, 0, round_no, max_rounds)
         round_no += 1
         failed_ids = {id(i) for i in failing}
-        items = [i for i in items if id(i) not in failed_ids] + revised
-        pending = revised
+        # 書き直せた主張は元の位置に置き換え、書き直せなかった主張は取り除く（節の中の順序を保つ）
+        items = [
+            revised.get(id(i), i) for i in items if id(i) not in failed_ids or id(i) in revised
+        ]
+        pending = list(revised.values())
         if not pending:
             break
 

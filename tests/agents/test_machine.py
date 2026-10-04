@@ -170,3 +170,22 @@ async def test_書き直した主張も_数値などの機械検査を通す() -
     await run_verification(backend, pool, memo, max_rounds=2)
     assert memo.business_risks == []  # 結論の語を含むので、検査で外れる
     assert any(i.kind == "forbidden_phrase" for r in memo.rejected for i in r.issues)
+
+
+async def test_書き直した主張は_節の中の元の位置に残る() -> None:
+    pool, memo = _setup()
+    second = Claim(text="従業員は百名である（2つ目）。", evidence_ids=["E2"])
+    memo.business_risks = [memo.business_risks[0], second]
+    backend = ScriptedBackend(
+        [
+            # 並び: overview[0], business_risks[0], business_risks[1]
+            verdicts((0, "supported", ""), (1, "partial", "言い過ぎ"), (2, "supported", "")),
+            revisions((0, "原材料等の価格が上昇した場合、影響する可能性がある。")),
+            verdicts((0, "supported", "")),
+        ]
+    )
+    await run_verification(backend, pool, memo, max_rounds=2)
+    assert [c.text for c in memo.business_risks] == [
+        "原材料等の価格が上昇した場合、影響する可能性がある。",
+        second.text,
+    ]

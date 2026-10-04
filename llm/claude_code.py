@@ -183,7 +183,8 @@ class ClaudeCodeBackend:
         if result is None:
             raise LLMBackendError("Claude Code から結果が返りませんでした")
         response = self._to_response(result, served_model)
-        if response.usage.output_tokens > max_tokens:
+        # 思考を有効にしているときは、思考のトークンが出力に数えられうるので、この判定はしない
+        if not self._think and response.usage.output_tokens > max_tokens:
             # Claude Code は max_tokens を超える出力を、続きを自動で生成して継続する。結果の本文は
             # 最後の続きの部分だけで、先頭が欠ける（実機で、JSON の途中から始まる応答が返った）。
             # 欠けた本文を採用しないよう、途中で切れた応答として扱う
