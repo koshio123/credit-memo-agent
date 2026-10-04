@@ -85,10 +85,21 @@ text-align:left}
 _JS = """
 document.addEventListener('click',function(e){
   var b=e.target.closest('button.cite'); if(!b) return;
-  var p=document.getElementById(b.dataset.target); if(!p) return;
-  var open=p.hasAttribute('hidden');
-  if(open){p.removeAttribute('hidden')}else{p.setAttribute('hidden','')}
-  b.setAttribute('aria-expanded', open?'true':'false');
+  var src=document.getElementById(b.dataset.target); if(!src) return;
+  var host=b.closest('li, tr'); if(!host) return;
+  var key=b.dataset.target, found=null;
+  host.querySelectorAll('.inline').forEach(function(x){ if(x.dataset.src===key) found=x; });
+  var next=host.nextElementSibling;
+  if(!found && next && next.classList.contains('inline-row') && next.dataset.src===key) found=next;
+  if(found){ found.remove(); b.setAttribute('aria-expanded','false'); return; }
+  var copy=src.cloneNode(true); copy.removeAttribute('id'); copy.removeAttribute('hidden');
+  copy.classList.add('inline'); copy.dataset.src=key;
+  if(host.tagName==='TR'){
+    var row=document.createElement('tr'); row.className='inline-row'; row.dataset.src=key;
+    var td=document.createElement('td'); td.colSpan=host.children.length; td.appendChild(copy);
+    row.appendChild(td); host.parentNode.insertBefore(row, host.nextSibling);
+  } else { host.appendChild(copy); }
+  b.setAttribute('aria-expanded','true');
 });
 """
 
@@ -215,5 +226,6 @@ def render_html(saved: SavedResult, pdf_base: str | None = None) -> str:
         '<p class="note">システムによる草案。人によるレビューを経るまで、審査資料として使用しない。'
         "融資の可否・金利・限度額・担保の要否について、結論も推奨も含まない。"
         "出典の番号を押すと、引用文・ページ・算式が出る。</p>"
-        f"{''.join(body)}{inspection}<h2>出典</h2>{panels}<script>{_JS}</script></body></html>"
+        f"{''.join(body)}{inspection}"
+        f'<div id="sources" hidden>{panels}</div><script>{_JS}</script></body></html>'
     )

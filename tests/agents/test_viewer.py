@@ -83,3 +83,13 @@ def test_型の確認() -> None:
 async def test_PDFのひな形に他の波括弧があっても_落ちない(service: EdinetService) -> None:
     html = render_html(await make_saved(service), pdf_base="file:///a{b}/{doc_id}.pdf")
     assert 'href="file:///a{b}/S100CUR0.pdf#page=2"' in html
+
+
+async def test_出典の欄は_押した項目のすぐ下に出す_ページ末尾に開かない(
+    service: EdinetService,
+) -> None:
+    # 実機（ブラウザ）で、欄が約3,000px下のページ末尾に開き、押しても何も起きないように見えた
+    html = render_html(await make_saved(service))
+    assert '<div id="sources" hidden>' in html  # 欄の元データは隠しておく
+    assert "<h2>出典</h2>" not in html
+    assert "cloneNode" in html and "host.appendChild" in html  # 押した項目の中に複製して出す
