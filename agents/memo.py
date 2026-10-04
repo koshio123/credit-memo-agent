@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from agents.checks import Issue
 from agents.policy import PolicyRow
-from agents.state import Claim
+from agents.state import Claim, Quarantined
 
 
 class IssueRecord(BaseModel):
@@ -44,6 +44,28 @@ class Failure(BaseModel):
 
     section: str  # all は、1回の呼び出しで全部の節を書くベースラインの失敗
     message: str
+
+
+class VerificationRecord(BaseModel):
+    """メモに残った主張の、Verifier の最終判定（アブレーションと人の判定との一致率の基礎）。"""
+
+    model_config = ConfigDict(frozen=True)
+
+    section: str
+    claim_text: str
+    verdict: str
+    reason: str = ""
+    round_no: int = 0  # この判定を得たラウンド（0 は最初の検証）
+
+
+class RoundRecord(BaseModel):
+    """検証の 1 ラウンドの記録。"""
+
+    model_config = ConfigDict(frozen=True)
+
+    round_no: int
+    n_verified: int
+    counts: dict[str, int]  # 判定ごとの件数
 
 
 class ClaimsOut(BaseModel):
@@ -92,3 +114,6 @@ class MemoDraft(BaseModel):
     rejected: list[Flagged] = Field(default_factory=list[Flagged])  # 検査で除外した主張
     warnings: list[Flagged] = Field(default_factory=list[Flagged])  # 残したが警告のある主張
     failures: list[Failure] = Field(default_factory=list[Failure])  # 形式を満たせず書けなかった節
+    verifications: list[VerificationRecord] = Field(default_factory=list[VerificationRecord])
+    rounds: list[RoundRecord] = Field(default_factory=list[RoundRecord])
+    quarantined: list[Quarantined] = Field(default_factory=list[Quarantined])  # 指示の形の本文
