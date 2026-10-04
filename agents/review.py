@@ -1,8 +1,10 @@
 """人が、主張と出典を突き合わせるための確認用の出力。
 
-メモの主張が出典の内容に支えられているか（意味）は、コードでは検証できない（W4 の Verifier の
-仕事）。それまでは人が確かめる。主張と、その出典の引用文・ページを並べ、判定の欄をつける。
-機械検査の警告（数値の不一致など）と、内規照合の各行も、同じ形で確かめられる。
+主張と、その出典の引用文・ページ・算式を並べ、判定の欄をつける。機械検査の警告と、内規照合の各行も
+同じ形で確かめられる。Verifier（LLM）の判定は、通常は主張の下に出す。**blind=True では出さない**:
+先に人が判定してから Verifier の判定と比べる（一致率を測る）ときに、人の判定が引きずられないように
+するため。blind の出力は、別のファイル名（.blind.review.md）で保存する。書き直された主張かどうかも、
+blind では示さない。
 """
 
 from agents.export import SavedResult
@@ -43,11 +45,12 @@ def _evidence_lines(evidence: PassageEvidence | MetricEvidence) -> list[str]:
     ]
 
 
-def render_review(saved: SavedResult) -> str:
+def render_review(saved: SavedResult, blind: bool = False) -> str:
     """主張と出典を突き合わせるための確認用の Markdown を作る。
 
     Args:
         saved: 保存された生成結果。
+        blind: True なら Verifier の判定を出さない（人の判定が引きずられないようにする）。
 
     Returns:
         判定の欄つきの Markdown。
@@ -76,7 +79,7 @@ def render_review(saved: SavedResult) -> str:
             number += 1
             lines += [f"### {number}. {claim.text}", ""]
             judged = verified.get((key, claim.text))
-            if judged is not None and judged.verdict != "not_applicable":
+            if not blind and judged is not None and judged.verdict != "not_applicable":
                 lines.append(f"  - Verifier（LLM）の判定: {judged.verdict}（{judged.reason}）")
             if claim.text in warned:
                 reasons = "; ".join(i.message for i in warned[claim.text].issues)
